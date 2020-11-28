@@ -37,7 +37,7 @@ Everything except fail2ban on my Contabo VPS are sourced from docker images.
 
 **Open-web accessible applications**
 
-* [Traefik 2.3](https://traefik.io/)\ - used for reverse proxying open-web applications
+* [Traefik 2.3](https://traefik.io/) \- used for reverse proxying open-web applications
 * [Firefox Syncserver](https://github.com/mozilla-services/syncserver) (MariaDB) - this is in the process of being moved to Rust, but that image isn't ready yet. Still using the old python 2.7 version to sync browser settings, extension lists, and bookmarks
 * [Wallabag](https://www.wallabag.it/en) (MariaDB) - Pocket replacement, this integrates very well with iOS and allows me to "stash" anything I come across on twitter, reddit, browsing, and more. I also have Wallabag set up as an RSS feed so when I stash something it shows up in my RSS reader
 * [Nextcloud](https://nextcloud.com) (Postgres) - primarily used as Google replacement, and I use it for Contacts, Calendar, Google Drive, and Tasks/ToDo hosting
