@@ -1,0 +1,772 @@
+version: "3.8"
+
+########################### NETWORKS
+networks:
+  traefik:
+    external:
+      name: traefik
+  default:
+    driver: bridge
+  socket-proxy:
+    external:
+      name: socket-proxy
+  internal:
+    external: false
+  vpn-subnet:
+    external:
+      name: vpn-subnet
+
+########################### SECRETS
+secrets:
+  cloudflare_email:
+    file: $SECRETSDIR/cloudflare_email
+  cloudflare_api_key:
+    file: $SECRETSDIR/cloudflare_api_key
+  mysql_root_password:
+    file: $SECRETSDIR/mysql_root_password
+  mysql_nextcloud_password:
+    file: $SECRETSDIR/postgres_nextcloud_password
+  postgres_root_password:
+    file: $SECRETSDIR/postgres_root_password
+  firesync_secret:
+    file: $SECRETSDIR/firesync_secret
+  postgres_nextcloud_password:
+    file: $SECRETSDIR/postgres_nextcloud_password
+
+########################### SERVICES
+services:
+  traefik:
+    container_name: traefik
+    image: traefik:latest
+    restart: unless-stopped
+    command: # CLI arguments
+      - --global.checkNewVersion=true
+      - --global.sendAnonymousUsage=false
+      - --entryPoints.http.address=:80
+      - --entryPoints.https.address=:443
+        # Allow these IPs to set the X-Forwarded-* headers - Cloudflare IPs: https://www.cloudflare.com/ips/
+      - --entrypoints.https.forwardedHeaders.trustedIPs=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/12,172.64.0.0/13,131.0.72.0/22
+      - --entryPoints.traefik.address=:8080
+      - --entrypoints.https.http.tls.certresolver=dns-cloudflare
+      - --api=true
+      - --log=true
+      - --log.level=DEBUG # (Default: error) DEBUG, INFO, WARN, ERROR, FATAL, PANIC
+      - --accessLog=true
+      - --accessLog.filePath=/traefik.log
+      - --accessLog.bufferingSize=100 # Configuring a buffer of 100 lines
+      - --accessLog.filters.statusCodes=400-499
+      - --providers.docker=true
+      - --providers.docker.endpoint=tcp://socket-proxy:2375
+      - --providers.docker.defaultrule=Host(`{{ index .Labels "com.docker.compose.service" }}.$DOMAINNAME`)
+      - --providers.docker.exposedByDefault=false
+      - --providers.docker.network=traefik
+      - --providers.docker.swarmMode=false
+      - --providers.file.directory=/rules # Load dynamic configuration from one or more .toml or .yml files in a directory.
+      - --providers.file.watch=true # Only works on top level files in the rules folder
+#      - --certificatesResolvers.dns-cloudflare.acme.caServer=https://acme-staging-v02.api.letsencrypt.org/directory # LetsEncrypt Staging Server - uncomment when testing
+      - --certificatesResolvers.dns-cloudflare.acme.email=$CLOUDFLARE_EMAIL
+      - --certificatesResolvers.dns-cloudflare.acme.storage=/acme.json
+      - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.provider=cloudflare
+      - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.resolvers=1.1.1.1:53,1.0.0.1:53
+      - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.delayBeforeCheck=5
+    networks:
+      - traefik
+      - socket-proxy
+    security_opt:
+      - no-new-privileges:true
+    secrets:
+      - cloudflare_email
+      - cloudflare_api_key
+    depends_on:
+      - socket-proxy
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+    volumes:
+      - $DOCKERDIR/traefik2/rules:/rules
+      - $DOCKERDIR/traefik2/acme/acme.json:/acme.json
+      - $DOCKERDIR/traefik2/traefik.log:/traefik.log
+      - $DOCKERDIR/shared:/shared
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - CF_API_EMAIL_FILE=/run/secrets/cloudflare_email
+      - CF_API_KEY_FILE=/run/secrets/cloudflare_api_key
+    labels:
+      - "traefik.enable=true"
+      # HTTP-to-HTTPS Redirect
+      - "traefik.http.routers.http-catchall.entrypoints=http"
+      - "traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      # HTTP Routers
+      - "traefik.http.routers.traefik-rtr.entrypoints=https"
+      - "traefik.http.routers.traefik-rtr.rule=Host(`traefik.$DOMAINNAME`)"
+      - "traefik.http.routers.traefik-rtr.tls=true"
+      #- "traefik.http.routers.traefik-rtr.tls.certresolver=dns-cloudflare" # Comment out this line after first run of traefik to force the use of wildcard certs
+      - "traefik.http.routers.traefik-rtr.tls.domains[0].main=$DOMAINNAME"
+      - "traefik.http.routers.traefik-rtr.tls.domains[0].sans=*.$DOMAINNAME"
+      ## Services - API
+      - "traefik.http.routers.traefik-rtr.service=api@internal"
+      ## Middlewares
+      - "traefik.http.routers.traefik-rtr.middlewares=chain-basic-auth@file"
+
+  socket-proxy:
+    container_name: socket-proxy
+    image: fluencelabs/docker-socket-proxy
+    restart: always
+    networks:
+      - socket-proxy
+    privileged: true
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    ports:
+      - "127.0.0.1:2375:2375"
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - LOG_LEVEL=info # debug,info,notice,warning,err,crit,alert,emerg
+      ## Variables match the URL prefix (i.e. AUTH blocks access to /auth/* parts of the API, etc.).
+      # 0 to revoke access.
+      # 1 to grant access.
+      ## Granted by Default
+      - EVENTS=1
+      - PING=1
+      - VERSION=1
+      ## Revoked by Default
+      # Security critical
+      - AUTH=0
+      - SECRETS=0
+      - POST=1 # Watchtower
+      - DELETE=1 # Watchtower
+        # GET Optons
+      - BUILD=0
+      - COMMIT=0
+      - CONFIGS=0
+      - CONTAINERS=1 # Traefik, portainer, etc.
+      - DISTRIBUTION=0
+      - EXEC=0
+      - IMAGES=1 # Portainer, Watchtower
+      - INFO=1 # Portainer
+      - NETWORKS=1 # Portainer, Watchtower
+      - NODES=0
+      - PLUGINS=0
+      - SERVICES=1 # Portainer
+      - SESSION=0
+      - SWARM=0
+      - SYSTEM=0
+      - TASKS=1 # Portaienr
+      - VOLUMES=1 # Portainer
+      # POST Options
+      - CONTAINERS_CREATE=1 # WatchTower
+      - CONTAINERS_START=1 # WatchTower
+      - CONTAINERS_UPDATE=1 # WatchTower
+      # DELETE Options
+      - CONTAINERS_DELETE=1 # WatchTower
+      - IMAGES_DELETE=1 # WatchTower
+
+  watchtower:
+    container_name: watchtower
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - socket-proxy
+    depends_on:
+      - socket-proxy
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_REMOVE_VOLUMES=true
+      - WATCHTOWER_INCLUDE_STOPPED=true
+      - WATCHTOWER_NO_STARTUP_MESSAGE=false
+      - WATCHTOWER_SCHEDULE=0 0 4 * * * # Everyday at 04:00
+      - WATCHTOWER_NOTIFICATIONS=shoutrrr
+      - WATCHTOWER_NOTIFICATION_URL=telegram://$TGRAM_BOT_TOKEN@telegram?channels=$TGRAM_CHAT_ID
+      - WATCHTOWER_NOTIFICATIONS_LEVEL=info
+      - DOCKER_HOST=tcp://socket-proxy:2375
+      - DOCKER_API_VERSION=1.40
+
+  mariadb:
+    container_name: mariadb
+    image: mariadb:latest
+    restart: always
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:3306:3306"
+    secrets:
+      - mysql_root_password
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --innodb-file-format=Barracuda
+      --innodb-file-per-table=1
+    volumes:
+      - $DOCKERDIR/mariadb/data:/var/lib/mysql
+      - $DOCKERDIR/mariadb/backups:/dbbackups
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
+
+  postgres:
+    container_name: postgres
+    image: postgres:alpine
+    restart: unless-stopped
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:5432:5432"
+    secrets:
+      - postgres_root_password
+    volumes:
+      - $DOCKERDIR/postgres:/var/lib/postgresql/data
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - POSTGRES_USER=$POSTGRES_USER
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_root_password
+
+  firefox-syncserver:
+    container_name: syncserver
+    image: mozilla/syncserver:1.9.1
+    restart: always
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    secrets:
+      - firesync_secret
+    ports:
+      - "5000:5000"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - SYNCSERVER_PUBLIC_URL=https://firesync.$DOMAINNAME
+      - SYNCSERVER_SECRET_FILE=/run/secrets/firesync_secret
+      - SYNCSERVER_SQLURI=pymysql://ffsync:$MYSQL_FFSYNC_PASSWORD@mariadb/ffsync
+      - SYNCSERVER_BATCH_UPLOAD_ENABLED=true
+      - SYNCSERVER_FORCE_WSGI_ENVIRON=true
+      - SYNCSERVER_ALLOW_NEW_USER=false
+      - PORT=5000
+    networks:
+      - traefik
+      - internal
+    depends_on:
+      - mariadb
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers
+      - "traefik.http.routers.syncserver-rtr.entrypoints=https"
+      - "traefik.http.routers.syncserver-rtr.rule=Host(`firesync.$DOMAINNAME`)"
+      - "traefik.http.routers.syncserver-rtr.tls=true"
+      ## Middlewares
+      - "traefik.http.routers.syncserver-rtr.middlewares=chain-no-auth@file"
+      ## HTTP Services
+      - "traefik.http.routers.syncserver-rtr.service=syncserver-svc"
+      - "traefik.http.services.syncserver-svc.loadbalancer.server.port=5000"
+
+  portainer:
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    restart: unless-stopped
+    networks:
+      vpn-subnet:
+        ipv4_address: 20.20.10.2
+      socket-proxy: null
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - socket-proxy
+    volumes:
+      - $DOCKERDIR/portainer:/data
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - DOCKER_HOST=tcp://socket-proxy:2375
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    networks:
+      internal: null
+      vpn-subnet:
+        ipv4_address: 20.20.10.3
+    depends_on:
+      - postgres
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - $DOCKERDIR/pgadmin:/var/lib/pgadmin
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - PGADMIN_DEFAULT_EMAIL=$PERSONAL_EMAIL
+      - PGADMIN_DEFAULT_PASSWORD=$PGADMIN_DEFAULT_PASSWORD
+      - PGADMIN_LISTEN_PORT=5050
+
+  pma:
+    container_name: phpmyadmin
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: phpmyadmin
+    restart: unless-stopped
+    networks:
+      internal: null
+      vpn-subnet:
+        ipv4_address: 20.20.10.4
+    depends_on:
+      - mariadb
+    secrets:
+      - mysql_root_password
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - PMA_HOST=mariadb
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
+      - ServerName=$DOMAINNAME
+
+  wallabag:
+    container_name: wallabag
+    image: wallabag/wallabag:latest
+    restart: always
+    networks:
+      - traefik
+      - internal
+    depends_on:
+      - mariadb
+    volumes:
+      - $DOCKERDIR/wallabag/images:/var/www/wallabag/web/assets/images
+      - $DOCKERDIR/wallabag/data:/var/www/wallabag/data
+    ports:
+      - 8006:80
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
+      - SYMFONY__ENV__DATABASE_DRIVER=pdo_mysql
+      - SYMFONY__ENV__DATABASE_HOST=mariadb
+      - SYMFONY__ENV__DATABASE_PORT=3306
+      - SYMFONY__ENV__DATABASE_NAME=wallabag
+      - SYMFONY__ENV__DATABASE_USER=wallabag
+      - SYMFONY__ENV__DATABASE_PASSWORD=$MYSQL_WALLA_PASSWORD
+      - SYMFONY__ENV__DATABASE_CHARSET=utf8mb4
+      - SYMFONY__ENV__DOMAIN_NAME=https://walla.$DOMAINNAME
+      - SYMFONY__ENV__FOSUSER_REGISTRATION=false
+    labels:
+      - traefik.enable=true
+      ## HTTP Routers
+      - traefik.http.routers.wallabag.entrypoints=https
+      - traefik.http.routers.wallabag.rule=Host(`walla.$DOMAINNAME`)
+      - traefik.http.routers.wallabag.tls=true
+      ## Middlewares
+      - traefik.http.routers.wallabag.middlewares=chain-no-auth@file
+      ## HTTP Services
+      - traefik.http.routers.wallabag.service=wallabag-svc
+      - traefik.http.services.wallabag-svc.loadbalancer.server.port=80
+
+  nextcloud:
+    container_name: nextcloud
+    image: nextcloud:latest
+    restart: always
+    networks:
+      - traefik
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - $DOCKERDIR/nextcloud:/var/www/html
+      - $DOCKERDIR/nextcloud/changes.ini:/usr/local/etc/php/conf.d/changes.ini
+    secrets:
+      - postgres_nextcloud_password
+    ports:
+      - 8008:80
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - POSTGRES_DB=nextcloud
+      - POSTGRES_USER=nextcloud
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_nextcloud_password
+      - POSTGRES_HOST=postgres
+      - NEXTCLOUD_TRUSTED_DOMAINS=nextcloud.$DOMAINNAME
+      - TRUSTED_PROXIES=172.18.0.0/16
+      - REDIS_HOST=redis
+      - REDIS_HOST_PASSWORD=$REDIS_PASSWORD
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers
+      - "traefik.http.routers.nextcloud-rtr.entrypoints=https"
+      - "traefik.http.routers.nextcloud-rtr.rule=Host(`nextcloud.$DOMAINNAME`)"
+      - "traefik.http.routers.nextcloud-rtr.tls=true"
+      ## Middlewares
+      - "traefik.http.routers.nextcloud-rtr.middlewares=chain-no-auth@file"
+      ## HTTP Services
+      - "traefik.http.routers.nextcloud-rtr.service=nextcloud-svc"
+      - "traefik.http.services.nextcloud-svc.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.nextcloud-dav.replacepathregex.regex=https://(.*)/.well-known/(card|cal)dav"
+      - "traefik.http.middlewares.nextcloud-dav.replacepathregex.replacement=https://$$1/remote.php/dav/"
+
+  nextcloud-cron:
+    container_name: nextcloud-cron
+    image: nextcloud:latest
+    entrypoint: /cron.sh
+    restart: always
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - nextcloud
+    volumes:
+      - $DOCKERDIR/nextcloud:/var/www/html
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+
+  wireguard:
+    container_name: wireguard
+    image: linuxserver/wireguard:latest
+    restart: unless-stopped
+    networks:
+      vpn-subnet:
+        ipv4_address: 20.20.10.5
+    volumes:
+      - $DOCKERDIR/wireguard:/config
+      - /lib/modules:/lib/modules
+    ports:
+      - 51820:51820/udp
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - SERVERURL=wireguard.$DOMAINNAME
+      - SERVERPORT=51820
+      - PEERS=2
+      - PEERDNS=auto
+      - INTERNAL_SUBNET=10.13.14.0
+
+  app:
+    container_name: ttrss-app
+    image: cthulhoo/ttrss-fpm-pgsql-static:latest
+    restart: always
+    networks:
+      - internal
+    depends_on:
+      - postgres
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - $DOCKERDIR/ttrss:/var/www/html
+    environment:
+      - TZ=$TZ
+      - DB_TYPE=pgsql
+      - DB_HOST=postgres
+      - DB_NAME=ttrss
+      - DB_USER=ttrss
+      - DB_PASS=$POSTGRES_TTRSS_PASSWORD
+      - OWNER_UID=$PUID
+      - OWNER_GID=$PGID
+      - SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss/
+
+  ttrss-updater:
+    container_name: ttrss-updater
+    image: cthulhoo/ttrss-fpm-pgsql-static:latest
+    restart: always
+    networks:
+      - internal
+    depends_on:
+      - app
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - $DOCKERDIR/ttrss:/var/www/html
+    environment:
+      - TZ=$TZ
+      - OWNER_UID=$PUID
+      - OWNER_GID=$PGID
+      - DB_TYPE=pgsql
+      - DB_HOST=postgres
+      - DB_NAME=ttrss
+      - DB_USER=ttrss
+      - DB_PASS=$POSTGRES_TTRSS_PASSWORD
+      - SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss/
+    command: /updater.sh
+
+  ttrss:
+    container_name: ttrss
+    image: cthulhoo/ttrss-web:latest
+    restart: unless-stopped
+    networks:
+      - traefik
+      - internal
+    depends_on:
+      - app
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - 8009:2015
+    volumes:
+      - $DOCKERDIR/ttrss:/var/www/html:ro
+    environment:
+      - TZ=$TZ
+      - OWNER_UID=$PUID
+      - OWNER_GID=$PGID
+      - HTTP_HOST=localhost
+      - HTTP_PORT=2015
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers
+      - "traefik.http.routers.ttrss-rtr.entrypoints=https"
+      - "traefik.http.routers.ttrss-rtr.rule=Host(`feed.$DOMAINNAME`)"
+      - "traefik.http.routers.ttrss-rtr.tls=true"
+      ## Middlewares
+      - "traefik.http.routers.ttrss-rtr.middlewares=chain-no-auth@file"
+      ## HTTP Services
+      - "traefik.http.routers.ttrss-rtr.service=ttrss-svc"
+      - "traefik.http.services.ttrss-svc.loadbalancer.server.port=2015"
+
+  bitwarden:
+    container_name: bitwarden
+    image: bitwardenrs/server-postgresql:latest
+    restart: always
+    volumes:
+      - $DOCKERDIR/bitwarden:/data
+    depends_on:
+      - postgres
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik
+      - internal
+    ports:
+      - 8003:80
+      - 3012:3012
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - WEBSOCKET_ENABLED=true # Required to use websockets
+      - SIGNUPS_ALLOWED=true # set to false to disable signups
+      - SIGNUPS_VERIFY=true
+      - SMTP_EXPLICIT_TLS=true
+#      - ADMIN_TOKEN=$ADMIN_TOKEN
+      - SMTP_HOST=$SMTP_HOST
+      - SMTP_FROM=$SMTP_FROM
+      - SMTP_PORT=$SMTP_PORT
+      - SMTP_SSL=true
+      - SMTP_USERNAME=$SMTP_USERNAME
+      - SMTP_PASSWORD=$SMTP_PASSWORD
+      - DOMAIN=https://vault.$DOMAINNAME
+      - DATABASE_URL=postgres://bitwarden:$POSTGRES_BITWARDEN_PASSWORD@postgres:5432/bitwarden
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers
+      - "traefik.http.routers.bitwarden-rtr.entrypoints=https"
+      - "traefik.http.routers.bitwarden-rtr.rule=Host(`vault.$DOMAINNAME`)"
+      - "traefik.http.routers.bitwarden-rtr.tls=true"
+      ## Middlewares
+      - "traefik.http.routers.bitwarden-rtr.middlewares=chain-no-auth@file"
+      ## HTTP Services
+      - "traefik.http.routers.bitwarden-rtr.service=bitwarden-svc"
+      - "traefik.http.services.bitwarden-svc.loadbalancer.server.port=80"
+      ## WS HTTP Routers
+      - "traefik.http.routers.bitwarden-ws-rtr.entrypoints=https"
+      - "traefik.http.routers.bitwarden-ws-rtr.rule=Host(`vault.$DOMAINNAME`) && Path(`/notifications/hub`)"
+      - "traefik.http.routers.bitwarden-ws-rtr.tls=true"
+      ## WS Middlewares
+      - "traefik.http.routers.bitwarden-ws-rtr.middlewares=chain-no-auth@file"
+      ## WS HTTP Services
+      - "traefik.http.routers.bitwarden-ws-rtr.service=bitwarden-ws-svc"
+      - "traefik.http.services.bitwarden-ws-svc.loadbalancer.server.port=3012"
+
+  snsync:
+    container_name: snsync
+    image: standardnotes/syncing-server:latest
+    restart: unless-stopped
+    #command: bash -c "bundle exec rails db:migrate && bundle exec rails server -b 0.0.0.0"
+    #command: start-local
+    networks:
+      - traefik
+      - internal
+    depends_on:
+      - mariadb
+    ports:
+      - 8007:3000
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - RAILS_ENV=production
+      - SECRET_KEY_BASE=$STANDARD_NOTES_SECRET
+      - EXPOSED_PORT=3000
+      - DB_PORT=3306
+      - DB_HOST=mariadb
+      - DB_DATABASE=standardnotes
+      - DB_USERNAME=standardnotes
+      - DB_PASSWORD=$MYSQL_STANDARDNOTES_PASSWORD
+      - DISABLE_USER_REGISTRATION=true
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers
+      - "traefik.http.routers.notesync-rtr.entrypoints=https"
+      - "traefik.http.routers.notesync-rtr.rule=Host(`notesync.$DOMAINNAME`)"
+      - "traefik.http.routers.notesync-rtr.tls=true"
+      ## Middlewares
+      - "traefik.http.routers.notesync-rtr.middlewares=chain-no-auth@file"
+      - "traefik.http.routers.notesync-rtr.middlewares=middlewares-standardnotes@file"
+      ## HTTP Services
+      - "traefik.http.routers.notesync-rtr.service=notesync-svc"
+      - "traefik.http.services.notesync-svc.loadbalancer.server.port=3000"
+
+  standardnotes:
+    container_name: standardnotes
+    image: standardnotes/web:stable
+    restart: unless-stopped
+    command: start-local
+    networks:
+      - traefik
+      - internal
+    depends_on:
+      - snsync
+    ports:
+      - 8010:3001
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - RAILS_ENV=development
+      - PORT=3001
+      - WEB_CONCURRENCY=0
+      - SECRET_KEY_BASE=$STANDARD_NOTES_SECRET
+      - APP_HOST=https://notes.$DOMAINNAME
+      - RAILS_SERVE_STATIC_FILES=true
+      - RAILS_LOG_TO_STDOUT=true
+      - EXTENSIONS_MANAGER_LOCATION=extensions/extensions-manager/dist/index.html
+      - BATCH_MANAGER_LOCATION=extensions/batch-manager/dist/index.min.html
+      - SF_DEFAULT_SERVER=https://notesync.$DOMAINNAME
+      - DATADOG_ENABLED=false
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers
+      - "traefik.http.routers.notes-rtr.entrypoints=https"
+      - "traefik.http.routers.notes-rtr.rule=Host(`notes.$DOMAINNAME`)"
+      - "traefik.http.routers.notes-rtr.tls=true"
+      ## Middlewares
+      - "traefik.http.routers.notes-rtr.middlewares=chain-no-auth@file"
+      ## HTTP Services
+      - "traefik.http.routers.notes-rtr.service=notes-svc"
+      - "traefik.http.services.notes-svc.loadbalancer.server.port=3001"
+
+  snext:
+    container_name: snext
+    image: sentriz/standardnotes-extensions
+    restart: unless-stopped
+    command: start-local
+    networks:
+      - traefik
+    depends_on:
+      - snsync
+    ports:
+      - 8011:80
+    volumes:
+      - $DOCKERDIR/snext:/repos
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - SN_EXTS_LISTEN_ADDR=:80
+      - SN_EXTS_REPOS_DIR=/repos
+      - SN_EXTS_DEFINITIONS_DIR=/definitions
+      - SN_EXTS_BASE_URL=https://snext.$DOMAINNAME
+      - SN_EXTS_UPDATE_INTERVAL_MINS=4320
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers
+      - "traefik.http.routers.snext-rtr.entrypoints=https"
+      - "traefik.http.routers.snext-rtr.rule=Host(`snext.$DOMAINNAME`)"
+      - "traefik.http.routers.snext-rtr.tls=true"
+      ## Middlewares
+      - "traefik.http.routers.snext-rtr.middlewares=chain-no-auth@file"
+      - "traefik.http.routers.snext-rtr.middlewares=middlewares-standardnotes@file"
+      ## HTTP Services
+      - "traefik.http.routers.snext-rtr.service=snext-svc"
+      - "traefik.http.services.snext-svc.loadbalancer.server.port=80"
+
+  redis:
+    container_name: redis
+    image: redis:latest
+    command: redis-server --requirepass $REDIS_PASSWORD
+    restart: always
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - $DOCKERDIR/redis:/data
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+
+  rediscommander:
+    container_name: rediscommander
+    image: rediscommander/redis-commander:latest
+    restart: always
+    networks:
+      internal: null
+      vpn-subnet:
+        ipv4_address: 20.20.10.6
+    depends_on:
+      - redis
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=$REDIS_PASSWORD
