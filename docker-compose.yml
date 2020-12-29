@@ -24,14 +24,14 @@ secrets:
     file: $SECRETSDIR/cloudflare_api_key
   mysql_root_password:
     file: $SECRETSDIR/mysql_root_password
-  mysql_nextcloud_password:
-    file: $SECRETSDIR/postgres_nextcloud_password
   postgres_root_password:
     file: $SECRETSDIR/postgres_root_password
   firesync_secret:
     file: $SECRETSDIR/firesync_secret
   postgres_nextcloud_password:
     file: $SECRETSDIR/postgres_nextcloud_password
+  restic_password:
+    file: $SECRETSDIR/restic_password
 
 ########################### SERVICES
 services:
@@ -153,7 +153,7 @@ services:
       - CONFIGS=0
       - CONTAINERS=1 # Traefik, portainer, etc.
       - DISTRIBUTION=0
-      - EXEC=0
+      - EXEC=1 # Restic
       - IMAGES=1 # Portainer, Watchtower
       - INFO=1 # Portainer
       - NETWORKS=1 # Portainer, Watchtower
@@ -770,3 +770,72 @@ services:
       - PGID=$PGID
       - REDIS_HOST=redis
       - REDIS_PASSWORD=$REDIS_PASSWORD
+
+  restic:
+    container_name: restic
+    image: mazzolino/restic:latest
+    restart: always
+    networks:
+      - socket-proxy
+      - internal
+    depends_on:
+      - socket-proxy
+      - mariadb
+      - postgres
+    security_opt:
+      - no-new-privileges:true
+    secrets:
+      - restic_password
+    volumes:
+      - $DOCKERDIR:/source/data:ro
+      - $DOCKERDIR/restic:/source/dbbackups/
+    environment:
+      TZ: $TZ
+      PUID: $PUID
+      PGID: $PGID
+      RUN_ON_STARTUP: "true"
+      BACKUP_CRON: "0 0 2 * * *"
+      RESTIC_REPOSITORY: b2:$B2_BUCKET:/restic
+      RESTIC_PASSWORD_FILE: /run/secrets/restic_password
+      RESTIC_BACKUP_SOURCES: /source
+      RESTIC_BACKUP_ARGS: >-
+        --verbose
+      RESTIC_FORGET_ARGS: >-
+        --keep-last 10
+        --keep-daily 7
+        --keep-weekly 5
+        --keep-monthly 12
+      B2_ACCOUNT_ID: $B2_ACCOUNT_ID
+      B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
+      DOCKER_HOST: tcp://socket-proxy:2375
+      PRE_COMMANDS: |-
+        docker exec mariadb mysqldump -u root --password="$MYSQL_ROOT_PASSWORD" --all-databases > /source/dbbackups/mariadb_dump.sql
+        docker exec postgres pg_dumpall -U $POSTGRES_USER > /source/dbbackups/postgres_dump.sql
+
+  restic-prune:
+    container_name: restic-prune
+    image: mazzolino/restic:latest
+    restart: always
+    networks:
+      - socket-proxy
+      - internal
+    depends_on:
+      - socket-proxy
+      - mariadb
+      - postgres
+    security_opt:
+      - no-new-privileges:true
+    secrets:
+      - restic_password
+    volumes:
+      - $DOCKERDIR:/source/data:ro
+      - $DOCKERDIR/restic:/source/dbbackups/
+    environment:
+      TZ: $TZ
+      PUID: $PUID
+      PGID: $PGID
+      PRUNE_CRON: "0 0 4 * * *"
+      RESTIC_REPOSITORY: b2:$B2_BUCKET:/restic
+      RESTIC_PASSWORD_FILE: /run/secrets/restic_password
+      B2_ACCOUNT_ID: $B2_ACCOUNT_ID
+      B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
