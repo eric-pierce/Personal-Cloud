@@ -834,7 +834,7 @@ services:
       TZ: $TZ
       PUID: $PUID
       PGID: $PGID
-      PRUNE_CRON: "0 0 4 * * *"
+      PRUNE_CRON: "0 0 3 * * *"
       RESTIC_REPOSITORY: b2:$B2_BUCKET:/restic
       RESTIC_PASSWORD_FILE: /run/secrets/restic_password
       B2_ACCOUNT_ID: $B2_ACCOUNT_ID
