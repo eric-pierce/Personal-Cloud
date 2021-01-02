@@ -34,6 +34,7 @@ Everything except fail2ban on my Contabo VPS are sourced from docker images.
 * [MariaDB](https://mariadb.org/) \- Open source MySQL server for applications which don't support my preferred SQL server, Postgres
 * [Postgres](https://www.postgresql.org/) \- Open source SQL server for applications which it
 * [Redis](https://redis.io/) \- Memcache to speed up Nextcloud
+* [Restic/Resticker](https://github.com/djmaze/resticker) \- This is a docker image which contains a parameterized version of Restic, for automated, encrypted, incremental backups. I'm backing up to a Backblaze B2 bucket which is low cost and use based.
 
 **Open-web accessible applications**
 
@@ -48,7 +49,6 @@ Everything except fail2ban on my Contabo VPS are sourced from docker images.
 * [Standardnotes Sync Server](https://github.com/standardnotes/syncing-server) (MariaDB) \- This is the official backend for standardnotes. I looked at the Go implementation as well (standardfile) but already had this running so didn't switch over. This is a new service for me as I was using the Nextcloud Notes before, but wasn't happy with the mobile app experience (manual sync over webdav in the Notebooks app). The official iOS app is just as seamless as the native iPhone notes app.
 * [Standardnotes Web App](https://github.com/standardnotes/web) \- the web frontend for standardnotes
 * [Standardnotes Extensions](https://github.com/sentriz/standardnotes-extensions) \- This is a docker image which contains all the open source extensions for standardnotes. It's very simple to run, and lets you use several high powered extensions all self-hosted
-* [Restic/Resticker](https://github.com/djmaze/resticker) \- This is a docker image which contains a parameterized version of Restic, for automated, encrypted, incremental backups. I'm backing up to a Backblaze B2 bucket which is low cost and use based.
 
 Services I'm considering adding in the future:
 
