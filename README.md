@@ -48,16 +48,13 @@ Everything except fail2ban on my Contabo VPS are sourced from docker images.
 * [Standardnotes Sync Server](https://github.com/standardnotes/syncing-server) \- This is the official backend for standardnotes. I looked at the Go implementation as well (standardfile) but already had this running so didn't switch over. This is a new service for me as I was using the Nextcloud Notes before, but wasn't happy with the mobile app experience (manual sync over webdav in the Notebooks app). The official iOS app is just as seamless as the native iPhone notes app.
 * [Standardnotes Web App](https://github.com/standardnotes/web) \- the web frontend for standardnotes
 * [Standardnotes Extensions](https://github.com/sentriz/standardnotes-extensions) \- This is a docker image which contains all the open source extensions for standardnotes. It's very simple to run, and lets you use several high powered extensions all self-hosted
-
-Services I'm working on adding now:
-
-* Some kind of backup solution - I was looking at [Volumerize](https://hub.docker.com/r/blacklabelops/volumerize/) for encrypted backups to my [rsync.net](https://rsync.net) account, but it appears that [the repo is going to be deprecated](https://github.com/blacklabelops/volumerize/issues/59) at some point in the near future
+* [Restic/Resticker](https://github.com/djmaze/resticker) \- This is a docker image which contains a parameterized version of Restic, for automated, encrypted, incremental backups. I'm backing up to a Backblaze B2 bucket which is low cost and use based.
 
 Services I'm considering adding in the future:
 
 * Authelia SSO
 * Bookstack
-* Apache Guacamole
+* MeshCentral
 * Papermerge
 * Monica CRM
 * fail2ban - may move it into a container
