@@ -495,14 +495,14 @@ services:
       - $DOCKERDIR/ttrss:/var/www/html
     environment:
       - TZ=$TZ
-      - DB_TYPE=pgsql
-      - DB_HOST=postgres
-      - DB_NAME=ttrss
-      - DB_USER=ttrss
-      - DB_PASS=$POSTGRES_TTRSS_PASSWORD
       - OWNER_UID=$PUID
       - OWNER_GID=$PGID
-      - SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss/
+      - TTRSS_DB_TYPE=pgsql
+      - TTRSS_DB_HOST=postgres
+      - TTRSS_DB_NAME=ttrss
+      - TTRSS_DB_USER=ttrss
+      - TTRSS_DB_PASS=$POSTGRES_TTRSS_PASSWORD
+      - TTRSS_SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss/
 
   ttrss-updater:
     container_name: ttrss-updater
@@ -520,13 +520,13 @@ services:
       - TZ=$TZ
       - OWNER_UID=$PUID
       - OWNER_GID=$PGID
-      - DB_TYPE=pgsql
-      - DB_HOST=postgres
-      - DB_NAME=ttrss
-      - DB_USER=ttrss
-      - DB_PASS=$POSTGRES_TTRSS_PASSWORD
-      - SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss/
-    command: /updater.sh
+      - TTRSS_DB_TYPE=pgsql
+      - TTRSS_DB_HOST=postgres
+      - TTRSS_DB_NAME=ttrss
+      - TTRSS_DB_USER=ttrss
+      - TTRSS_DB_PASS=$POSTGRES_TTRSS_PASSWORD
+      - TTRSS_SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss/
+    command: /opt/tt-rss/updater.sh
 
   ttrss:
     container_name: ttrss
