@@ -10,11 +10,3 @@
   [http.middlewares.nextcloud-chain]
     [http.middlewares.nextcloud-chain.chain]
       middlewares = [ "middlewares-rate-limit", "middlewares-nextcloud"]
-
-  [http.middlewares.standardnotes-chain]
-    [http.middlewares.standardnotes-chain.chain]
-      middlewares = [ "middlewares-rate-limit", "middlewares-standardnotes"]
-
-  [http.middlewares.standardnotes-sync-chain]
-    [http.middlewares.standardnotes-sync-chain.chain]
-      middlewares = [ "middlewares-rate-limit", "middlewares-standardnotes-sync"]
