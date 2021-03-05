@@ -51,3 +51,7 @@
   [http.middlewares.middlewares-standardnotes]
     [http.middlewares.middlewares-standardnotes.headers.customResponseHeaders]
       accessControlAllowHeaders = "https://notes.$DOMAIN"
+      
+  [http.middlewares.middlewares-nextcloud]
+    [http.middlewares.middlewares-nextcloud.headers.customResponseHeaders]
+        X-Robots-Tag = "none"
