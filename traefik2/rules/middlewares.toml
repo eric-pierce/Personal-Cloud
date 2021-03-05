@@ -60,7 +60,7 @@
       forceSTSHeader = true
 #      frameDeny = true #overwritten by customFrameOptionsValue
 #      customFrameOptionsValue = "allow-from https:$DOMAIN" #CSP takes care of this but may be needed for organizr.
-      customFrameOptionsValue = "allow-from https://notes.$DOMAIN"
+#      customFrameOptionsValue = "allow-from https://notes.$DOMAIN"
       contentTypeNosniff = true
       browserXssFilter = true
 #      sslForceHost = true # add sslHost and all of the
