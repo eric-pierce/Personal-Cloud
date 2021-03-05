@@ -48,62 +48,6 @@
         Permissions-Policy = "camera=(), geolocation=(), microphone=(), payment=(), usb=(), vr=(),"
         server = ""
 
-  [http.middlewares.middlewares-standardnotes]
-    [http.middlewares.middlewares-standardnotes.headers]
-      accessControlAllowMethods= ["GET", "OPTIONS", "PUT"]
-      accessControlMaxAge = 100
-      hostsProxyHeaders = ["X-Forwarded-Host"]
-      sslRedirect = true
-      stsSeconds = 63072000
-      stsIncludeSubdomains = true
-      stsPreload = true
-      forceSTSHeader = true
-#      frameDeny = true #overwritten by customFrameOptionsValue
-#      customFrameOptionsValue = "allow-from https:$DOMAIN" #CSP takes care of this but may be needed for organizr.
-#      customFrameOptionsValue = "SAMEORIGIN"
-      contentTypeNosniff = true
-      browserXssFilter = true
-#      sslForceHost = true # add sslHost and all of the
-#      sslHost = "$DOMAIN"
-      referrerPolicy = "same-origin"
-#      Setting contentSecurityPolicy is more secure but it can break things. Proper auth will reduce the risk.
-#      the below line also breaks some apps due to 'none' - sonarr, radarr, etc.
-#      contentSecurityPolicy = "frame-ancestors '*.$DOMAIN:*';object-src 'none';script-src 'none';"
-      featurePolicy = "camera 'none'; geolocation 'none'; microphone 'none'; payment 'none'; usb 'none'; vr 'none';"
-      [http.middlewares.middlewares-standardnotes.headers.customResponseHeaders]
-        X-Robots-Tag = "none,noarchive,nosnippet,notranslate,noimageindex,"
-        Permissions-Policy = "camera=(), geolocation=(), microphone=(), payment=(), usb=(), vr=(),"
-        server = ""
-        accessControlAllowHeaders = "https://notesync.$DOMAIN"
-
-  [http.middlewares.middlewares-standardnotes-sync]
-    [http.middlewares.middlewares-standardnotes-sync.headers]
-      accessControlAllowMethods= ["GET", "OPTIONS", "PUT"]
-      accessControlMaxAge = 100
-      hostsProxyHeaders = ["X-Forwarded-Host"]
-      sslRedirect = true
-      stsSeconds = 63072000
-      stsIncludeSubdomains = true
-      stsPreload = true
-      forceSTSHeader = true
-#      frameDeny = true #overwritten by customFrameOptionsValue
-#      customFrameOptionsValue = "allow-from https:$DOMAIN" #CSP takes care of this but may be needed for organizr.
-      customFrameOptionsValue = "SAMEORIGIN"
-      contentTypeNosniff = true
-      browserXssFilter = true
-#      sslForceHost = true # add sslHost and all of the
-#      sslHost = "$DOMAIN"
-      referrerPolicy = "same-origin"
-#      Setting contentSecurityPolicy is more secure but it can break things. Proper auth will reduce the risk.
-#      the below line also breaks some apps due to 'none' - sonarr, radarr, etc.
-#      contentSecurityPolicy = "frame-ancestors '*.$DOMAIN:*';object-src 'none';script-src 'none';"
-      featurePolicy = "camera 'none'; geolocation 'none'; microphone 'none'; payment 'none'; usb 'none'; vr 'none';"
-      [http.middlewares.middlewares-standardnotes-sync.headers.customResponseHeaders]
-        X-Robots-Tag = "none,noarchive,nosnippet,notranslate,noimageindex,"
-        Permissions-Policy = "camera=(), geolocation=(), microphone=(), payment=(), usb=(), vr=(),"
-        server = ""
-        accessControlAllowHeaders = "https://notes.$DOMAIN"
-
   [http.middlewares.middlewares-nextcloud]
     [http.middlewares.middlewares-nextcloud.headers]
       accessControlAllowMethods= ["GET", "OPTIONS", "PUT"]
