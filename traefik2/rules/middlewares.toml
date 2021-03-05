@@ -50,7 +50,7 @@
 
   [http.middlewares.middlewares-standardnotes]
     [http.middlewares.middlewares-standardnotes.headers]
-      accessControlAllowMethods= ["GET", "OPTIONS", "PUT"]
+#      accessControlAllowMethods= ["GET", "OPTIONS", "PUT"]
       accessControlMaxAge = 100
       hostsProxyHeaders = ["X-Forwarded-Host"]
       sslRedirect = true
@@ -65,7 +65,7 @@
       browserXssFilter = true
 #      sslForceHost = true # add sslHost and all of the
 #      sslHost = "$DOMAIN"
-      referrerPolicy = "same-origin"
+#      referrerPolicy = "same-origin"
 #      Setting contentSecurityPolicy is more secure but it can break things. Proper auth will reduce the risk.
 #      the below line also breaks some apps due to 'none' - sonarr, radarr, etc.
 #      contentSecurityPolicy = "frame-ancestors '*.$DOMAIN:*';object-src 'none';script-src 'none';"
