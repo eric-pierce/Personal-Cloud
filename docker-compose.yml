@@ -691,7 +691,7 @@ services:
       - "traefik.http.routers.notes-rtr.rule=Host(`notes.$DOMAINNAME`)"
       - "traefik.http.routers.notes-rtr.tls=true"
       ## Middlewares
-      - "traefik.http.routers.notes-rtr.middlewares=standardnotes-chain@file"
+      - "traefik.http.routers.notes-rtr.middlewares=chain-no-auth@file"
       ## HTTP Services
       - "traefik.http.routers.notes-rtr.service=notes-svc"
       - "traefik.http.services.notes-svc.loadbalancer.server.port=3001"
