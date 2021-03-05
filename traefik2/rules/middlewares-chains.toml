@@ -7,10 +7,10 @@
     [http.middlewares.chain-basic-auth.chain]
       middlewares = [ "middlewares-rate-limit", "middlewares-secure-headers", "middlewares-basic-auth"]
 
-  [http.middlewares.nextcloud]
-    [http.middlewares.nextcloud]
+  [http.middlewares.nextcloud-chain]
+    [http.middlewares.nextcloud-chain]
       middlewares = [ "middlewares-rate-limit", "middlewares-nextcloud"]
 
-  [http.middlewares.standardnotes]
-    [http.middlewares.standardnotes.chain]
+  [http.middlewares.standardnotes-chain]
+    [http.middlewares.standardnotes-chain.chain]
       middlewares = [ "middlewares-rate-limit", "middlewares-standardnotes"]
