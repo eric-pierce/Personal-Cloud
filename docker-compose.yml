@@ -250,14 +250,19 @@ services:
     container_name: syncserver
     image: mozilla/syncserver:1.9.1
     restart: always
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - traefik
+      - internal
+    depends_on:
+      - mariadb
     secrets:
       - firesync_secret
     ports:
       - "5000:5000"
     security_opt:
       - no-new-privileges:true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
     environment:
       - TZ=$TZ
       - PUID=$PUID
@@ -269,11 +274,6 @@ services:
       - SYNCSERVER_FORCE_WSGI_ENVIRON=true
       - SYNCSERVER_ALLOW_NEW_USER=false
       - PORT=5000
-    networks:
-      - traefik
-      - internal
-    depends_on:
-      - mariadb
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
@@ -563,7 +563,7 @@ services:
 
   bitwarden:
     container_name: bitwarden
-    image: bitwardenrs/server-postgresql:latest
+    image: vaultwarden/server:latest
     restart: always
     volumes:
       - $DOCKERDIR/bitwarden:/data
@@ -619,8 +619,6 @@ services:
     container_name: snsync
     image: standardnotes/syncing-server:latest
     restart: unless-stopped
-    #command: bash -c "bundle exec rails db:migrate && bundle exec rails server -b 0.0.0.0"
-    #command: start-local
     networks:
       - traefik
       - internal
@@ -663,7 +661,6 @@ services:
     command: start-local
     networks:
       - traefik
-      - internal
     depends_on:
       - snsync
     ports:
@@ -753,24 +750,24 @@ services:
       - PUID=$PUID
       - PGID=$PGID
 
-  rediscommander:
-    container_name: rediscommander
-    image: rediscommander/redis-commander:latest
-    restart: always
-    networks:
-      internal: null
-      vpn-subnet:
-        ipv4_address: 20.20.10.6
-    depends_on:
-      - redis
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - REDIS_HOST=redis
-      - REDIS_PASSWORD=$REDIS_PASSWORD
+  #rediscommander:
+  #  container_name: rediscommander
+  #  image: rediscommander/redis-commander:latest
+  #  restart: always
+  #  networks:
+  #    internal: null
+  #    vpn-subnet:
+  #      ipv4_address: 20.20.10.6
+  #  depends_on:
+  #    - redis
+  #  security_opt:
+  #    - no-new-privileges:true
+  #  environment:
+  #    - TZ=$TZ
+  #    - PUID=$PUID
+  #    - PGID=$PGID
+  #    - REDIS_HOST=redis
+  #    - REDIS_PASSWORD=$REDIS_PASSWORD
 
   restic:
     container_name: restic
