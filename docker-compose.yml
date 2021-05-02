@@ -357,7 +357,7 @@ services:
       - traefik
       - internal
     depends_on:
-      - mariadb
+      - postgres
     volumes:
       - $DOCKERDIR/wallabag/images:/var/www/wallabag/web/assets/images
       - $DOCKERDIR/wallabag/data:/var/www/wallabag/data
@@ -367,16 +367,18 @@ services:
       - TZ=$TZ
       - PUID=$PUID
       - PGID=$PGID
-      - MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
-      - SYMFONY__ENV__DATABASE_DRIVER=pdo_mysql
-      - SYMFONY__ENV__DATABASE_HOST=mariadb
-      - SYMFONY__ENV__DATABASE_PORT=3306
+      - SYMFONY__ENV__DATABASE_DRIVER=pdo_pgsql
+      - SYMFONY__ENV__DATABASE_HOST=postgres
+      - SYMFONY__ENV__DATABASE_PORT=5432
       - SYMFONY__ENV__DATABASE_NAME=wallabag
       - SYMFONY__ENV__DATABASE_USER=wallabag
-      - SYMFONY__ENV__DATABASE_PASSWORD=$MYSQL_WALLA_PASSWORD
-      - SYMFONY__ENV__DATABASE_CHARSET=utf8mb4
+      - SYMFONY__ENV__DATABASE_PASSWORD=$POSTGRES_WALLA_PASSWORD
+      - SYMFONY__ENV__SECRET=$WALLA_SECRET
       - SYMFONY__ENV__DOMAIN_NAME=https://walla.$DOMAINNAME
+      - SYMFONY__ENV__REDIS_HOST=redis
+      - SYMFONY__ENV__REDIS_PASSWORD=$REDIS_PASSWORD
       - SYMFONY__ENV__FOSUSER_REGISTRATION=false
+      - POPULATE_DATABASE=False
     labels:
       - traefik.enable=true
       ## HTTP Routers
