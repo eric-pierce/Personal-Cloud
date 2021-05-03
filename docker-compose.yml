@@ -584,7 +584,7 @@ services:
       - PUID=$PUID
       - PGID=$PGID
       - WEBSOCKET_ENABLED=true # Required to use websockets
-      - SIGNUPS_ALLOWED=true # set to false to disable signups
+      - SIGNUPS_ALLOWED=false # set to false to disable signups
       - SIGNUPS_VERIFY=true
       - SMTP_EXPLICIT_TLS=true
 #      - ADMIN_TOKEN=$ADMIN_TOKEN
