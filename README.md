@@ -50,7 +50,7 @@ Everything except fail2ban on my Contabo VPS are sourced from docker images.
 * [Standardnotes Web App](https://github.com/standardnotes/web) \- the web frontend for standardnotes
 * [Standardnotes Extensions](https://github.com/sentriz/standardnotes-extensions) \- This is a docker image which contains all the open source extensions for standardnotes. It's very simple to run, and lets you use several high powered extensions all self-hosted
 * [MeshCentral](https://github.com/Ylianst/MeshCentral) \- This is a complete replacement for TeamViewer, and enables remote access to my devices without needing to use a third party service. The only downside I've found here is that there isn't a native mobile app.
-* 
+
 Services I'm considering adding in the future:
 
 * Bookstack
