@@ -1067,7 +1067,7 @@ services:
       - REVERSE_PROXY_TLS_PORT=443
       - IFRAME=false
       - ALLOW_NEW_ACCOUNTS=false
-      - WEBRTC=false
+      - WEBRTC=true
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
