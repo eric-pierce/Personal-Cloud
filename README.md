@@ -1,6 +1,6 @@
 # Personal-Cloud
 
-In 2019 I began to replace services that I use and which use my data with services I can host on a personal Virtual Private Server, and have complete control of the data. In 2020 I went through a migration from Traefik 1.7 to 2.3, and took the opportunity to completely revamp my self hosting approach, applications, best practices, security, and more. I'm hosting everything on a Contabo VPS and on a local Raspberry Pi.
+In 2019 I began to replace services that I use and which use my data with services I can host on a personal Virtual Private Server, and have complete control of the data. In 2020 I went through a migration from Traefik 1.7 to 2.4, and took the opportunity to completely revamp my self hosting approach, applications, best practices, security, and more. I'm hosting everything on a Contabo VPS and on a local Raspberry Pi.
 
 **Local Raspberry Pi**
 
@@ -25,7 +25,7 @@ Everything except fail2ban on my Contabo VPS are sourced from docker images.
 * [Portainer](https://www.portainer.io/) \- Docker Management
 * [PhpMyAdmin](https://www.phpmyadmin.net/) \- Management of a MariaDB database for applications which don't support Postgres
 * [PgAdmin](https://www.pgadmin.org/) \- Management of a Postgres database for any applications which do support Postgres
-* [Redis Commander](https://github.com/joeferner/redis-commander) \- for managing my Redis Memcache installation to speed up Nextcloud
+* [Redis Commander](https://github.com/joeferner/redis-commander) (Currently Disabled) \- for managing my Redis Memcache installation to speed up Nextcloud
 
 **Non-Open-web accessible applications**
 
@@ -38,7 +38,7 @@ Everything except fail2ban on my Contabo VPS are sourced from docker images.
 
 **Open-web accessible applications**
 
-* [Traefik 2.3](https://traefik.io/) \- used for reverse proxying open-web applications
+* [Traefik 2.4](https://traefik.io/) \- used for reverse proxying open-web applications
 * [Firefox Syncserver](https://github.com/mozilla-services/syncserver) (MariaDB) - this is in the process of being moved to Rust, but that image isn't ready yet. Still using the old python 2.7 version to sync browser settings, extension lists, and bookmarks
 * [Wallabag](https://www.wallabag.it/en) (Postgres) - Pocket replacement, this integrates very well with iOS and allows me to "stash" anything I come across on twitter, reddit, browsing, and more. I also have Wallabag set up as an RSS feed so when I stash something it shows up in my RSS reader.
 * [Nextcloud](https://nextcloud.com) (Postgres) - primarily used as Google replacement, and I use it for Contacts, Calendar, Google Drive, and Tasks/ToDo hosting
@@ -46,15 +46,14 @@ Everything except fail2ban on my Contabo VPS are sourced from docker images.
 * [Wireguard](https://github.com/linuxserver/docker-wireguard) \- allows me to access internal services via VPN. This is one of the few "unofficial" images as I don't think wireguard hosts an official one
 * [Tiny-Tiny-RSS](https://tt-rss.org/) (Postgres) - Last year the developer created official docker images, so I moved from an unofficially maintained one to the official ones. This consists of a backend and frontend component, as well as an updater cron job. I much prefer this approach as the unofficial image wasn't static, and was just an older docker image that pulled the latest version of the app from Git.
 * [Vaultwarden](https://github.com/dani-garcia/vaultwarden) (Postgres) - This is the unofficial bitwarden api/backend/frontend implementation in Rust. I moved from the default sqlite backend to a postgres backend and found that it is now much speedier when updating folders
-* [Standardnotes Sync Server](https://github.com/standardnotes/syncing-server) (MariaDB) \- This is the official backend for standardnotes. I looked at the Go implementation as well (standardfile) but already had this running so didn't switch over. This is a new service for me as I was using the Nextcloud Notes before, but wasn't happy with the mobile app experience (manual sync over webdav in the Notebooks app). The official iOS app is just as seamless as the native iPhone notes app.
+* [Standardnotes Sync Server](https://github.com/standardnotes/syncing-server) (MariaDB) \- This is the official backend for standardnotes. I looked at the Go implementation as well (standardfile) but already had this running so didn't switch over. This is a new service for me as I was using the Nextcloud Notes before, but wasn't happy with the mobile app experience (manual sync over webdav in the Notebooks app). The official iOS app is just as seamless as the native iPhone notes app. This backend server was recently re-written in JavaScript (previously Ruby on Rails).
 * [Standardnotes Web App](https://github.com/standardnotes/web) \- the web frontend for standardnotes
 * [Standardnotes Extensions](https://github.com/sentriz/standardnotes-extensions) \- This is a docker image which contains all the open source extensions for standardnotes. It's very simple to run, and lets you use several high powered extensions all self-hosted
-
+* [MeshCentral](https://github.com/Ylianst/MeshCentral) \- This is a complete replacement for TeamViewer, and enables remote access to my devices without needing to use a third party service. The only downside I've found here is that there isn't a native mobile app.
+* 
 Services I'm considering adding in the future:
 
-* Authelia SSO
 * Bookstack
-* MeshCentral
 * Papermerge
 * Monica CRM
 * fail2ban - may move it into a container
