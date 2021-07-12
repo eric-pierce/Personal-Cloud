@@ -791,7 +791,7 @@ services:
       - AUTH_JWT_SECRET=$AUTH_JWT_SECRET
       - SYNCING_SERVER_URL=http://snsync:3000
       - NEW_RELIC_ENABLED=false
-      - NEW_RELIC_APP_NAME=Auth
+      - NEW_RELIC_APP_NAME=AuthWorker
       - NEW_RELIC_NO_CONFIG_FILE=true
       - REDIS_EVENTS_CHANNEL=auth-events
       - AUTH_JWT_TTL=60000
