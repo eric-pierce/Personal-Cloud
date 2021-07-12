@@ -697,7 +697,7 @@ services:
       - DB_DEBUG_LEVEL=all
       - DB_MIGRATIONS_PATH=dist/migrations/*.js
       - NEW_RELIC_ENABLED=false
-      - NEW_RELIC_APP_NAME=Sync
+      - NEW_RELIC_APP_NAME=SyncWorker
       - NEW_RELIC_NO_CONFIG_FILE=true
       - REDIS_URL=redis://redis:$REDIS_PASSWORD@redis:6379
       - REDIS_EVENTS_CHANNEL=events
