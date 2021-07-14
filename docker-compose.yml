@@ -626,6 +626,7 @@ services:
     depends_on:
       - mariadb
       - redis
+      - snext
     ports:
       - "127.0.0.1:3000:3000"
     entrypoint: [
@@ -899,13 +900,11 @@ services:
 
   snext:
     container_name: snext
-    image: sentriz/standardnotes-extensions
+    image: ericpierce/standardnotes-extension-server:latest
     restart: unless-stopped
     command: start-local
     networks:
       - traefik
-    depends_on:
-      - snsync
     ports:
       - 8011:80
     volumes:
