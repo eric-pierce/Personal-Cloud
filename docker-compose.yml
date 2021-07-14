@@ -619,7 +619,7 @@ services:
 
   snsync:
     container_name: snsync
-    image: standardnotes/syncing-server-js:latest
+    image: standardnotes/syncing-server-js:$SNSYNC_VERSION
     restart: unless-stopped
     networks:
       - internal
@@ -664,7 +664,7 @@ services:
 
   snsync-worker:
     container_name: snsync-worker
-    image: standardnotes/syncing-server-js:latest
+    image: standardnotes/syncing-server-js:$SNSYNC_VERSION
     restart: unless-stopped
     networks:
       - internal
@@ -708,7 +708,7 @@ services:
 
   snauth:
     container_name: snauth
-    image: standardnotes/auth:latest
+    image: standardnotes/auth:$SNAUTH_VERSION
     restart: unless-stopped
     networks:
       - internal
@@ -762,7 +762,7 @@ services:
 
   snauth-worker:
     container_name: snauth-worker
-    image: standardnotes/auth:latest
+    image: standardnotes/auth:$SNAUTH_VERSION
     restart: unless-stopped
     networks:
       - internal
@@ -814,7 +814,7 @@ services:
 
   snapi:
     container_name: snapi
-    image: standardnotes/api-gateway:latest
+    image: standardnotes/api-gateway:1.20.0
     restart: unless-stopped
     networks:
       - traefik
