@@ -818,7 +818,7 @@ services:
 
   snapi:
     container_name: snapi
-    image: standardnotes/api-gateway:1.20.0
+    image: standardnotes/api-gateway:$SNAPI_VERSION
     restart: unless-stopped
     networks:
       - traefik
