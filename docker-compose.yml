@@ -661,6 +661,7 @@ services:
       - AUTH_SERVER_URL=http://snauth:3002
       - EMAIL_ATTACHMENT_MAX_BYTE_SIZE=10485760
       - REVISIONS_FREQUENCY=300
+      - VERSION=local
 
   snsync-worker:
     container_name: snsync-worker
@@ -705,6 +706,7 @@ services:
       - AUTH_SERVER_URL=http://snauth:3002
       - EMAIL_ATTACHMENT_MAX_BYTE_SIZE=10485760
       - REVISIONS_FREQUENCY=300
+      - VERSION=local
 
   snauth:
     container_name: snauth
@@ -759,6 +761,7 @@ services:
       - DB_MIGRATIONS_PATH=dist/migrations/*.js
       - REDIS_URL=redis://redis:$REDIS_PASSWORD@redis:6379
       - DISABLE_USER_REGISTRATION=true
+      - VERSION=local
 
   snauth-worker:
     container_name: snauth-worker
@@ -811,6 +814,7 @@ services:
       - DB_MIGRATIONS_PATH=dist/migrations/*.js
       - REDIS_URL=redis://redis:$REDIS_PASSWORD@redis:6379
       - DISABLE_USER_REGISTRATION=true
+      - VERSION=local
 
   snapi:
     container_name: snapi
@@ -844,6 +848,7 @@ services:
       - AUTH_SERVER_URL=http://snauth:3002
       - AUTH_JWT_SECRET=$AUTH_JWT_SECRET
       - PORT=3000
+      - VERSION=local
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
