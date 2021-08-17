@@ -1085,3 +1085,71 @@ services:
       ## HTTP Services
       - "traefik.http.routers.mesh-rtr.service=mesh-svc"
       - "traefik.http.services.mesh-svc.loadbalancer.server.port=443"
+
+  tandoor_backend:
+    container_name: tandoor_backend
+    image: vabene1111/recipes:latest
+    restart: always
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - postgres
+    volumes:
+      - $DOCKERDIR/tandoor/staticfiles:/opt/recipes/staticfiles
+      - $DOCKERDIR/tandoor/nginx_config:/opt/recipes/nginx/conf.d
+      - $DOCKERDIR/tandoor/mediafiles:/opt/recipes/mediafiles
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - DEBUG=0
+      - ALLOWED_HOSTS=tandoor.$DOMAINNAME
+      - TIMEZONE=$TZ
+      - SECRET_KEY=$TANDOOR_SECRET_KEY
+      - DB_ENGINE=django.db.backends.postgresql
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=tandoor
+      - POSTGRES_PASSWORD=$POSTGRES_TANDOOR_PASSWORD
+      - POSTGRES_DB=tandoor
+      - FRACTION_PREF_DEFAULT=0
+      - COMMENT_PREF_DEFAULT=1
+      - SHOPPING_MIN_AUTOSYNC_INTERVAL=5
+      - GUNICORN_MEDIA=0
+      - ENABLE_SIGNUP=0
+
+  tandoor:
+    container_name: tandoor
+    image: nginx:mainline-alpine
+    restart: always
+    networks:
+      - traefik
+      - internal
+    depends_on:
+      - traefik
+      - tandoor_backend
+    ports:
+      - 8087:80
+    volumes:
+      - $DOCKERDIR/tandoor/staticfiles:/static
+      - $DOCKERDIR/tandoor/nginx_config:/etc/nginx/conf.d:ro
+      - $DOCKERDIR/tandoor/mediafiles:/media
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers
+      - "traefik.http.routers.tandoor-rtr.entrypoints=https"
+      - "traefik.http.routers.tandoor-rtr.rule=Host(`tandoor.$DOMAINNAME`)"
+      - "traefik.http.routers.tandoor-rtr.tls=true"
+      ## Middlewares
+      - "traefik.http.routers.tandoor-rtr.middlewares=chain-no-auth@file"
+      ## HTTP Services
+      - "traefik.http.routers.tandoor-rtr.service=tandoor-svc"
+      - "traefik.http.services.tandoor-svc.loadbalancer.server.port=80"
