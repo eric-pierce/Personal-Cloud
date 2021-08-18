@@ -889,10 +889,7 @@ services:
       - EXTENSIONS_MANAGER_LOCATION=extensions/extensions-manager/dist/index.html
       - BATCH_MANAGER_LOCATION=extensions/batch-manager/dist/index.min.html
       - SF_DEFAULT_SERVER=https://notesync.$DOMAINNAME
-      - SF_NEXT_VERSION_SERVER=https://notesync.$DOMAINNAME
       - DATADOG_ENABLED=false
-      - DEV_DEFAULT_SYNC_SERVER=https://notes.$DOMAINNAME
-      - DEV_EXTENSIONS_MANAGER_LOCATION=public/extensions/extensions-manager/dist/index.html
       - ENABLE_UNFINISHED_FEATURES=false
     labels:
       - "traefik.enable=true"
