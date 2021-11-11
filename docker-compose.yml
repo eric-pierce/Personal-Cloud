@@ -886,9 +886,9 @@ services:
       - APP_HOST=https://notes.$DOMAINNAME
       - RAILS_SERVE_STATIC_FILES=true
       - RAILS_LOG_TO_STDOUT=true
-      - EXTENSIONS_MANAGER_LOCATION=extensions/extensions-manager/dist/index.html
-      - BATCH_MANAGER_LOCATION=extensions/batch-manager/dist/index.min.html
-      - SF_DEFAULT_SERVER=https://notesync.$DOMAINNAME
+      - RAILS_LOG_LEVEL=INFO
+      - DEFAULT_SYNC_SERVER=https://notesync.$DOMAINNAME
+      - DEV_DEFAULT_SYNC_SERVER=https://notesync.$DOMAINNAME
       - DATADOG_ENABLED=false
       - ENABLE_UNFINISHED_FEATURES=false
     labels:
