@@ -849,6 +849,7 @@ services:
       - SYNCING_SERVER_JS_URL=http://snsync:3000
       - AUTH_SERVER_URL=http://snauth:3002
       - REDIS_URL=redis://redis:$REDIS_PASSWORD@redis:6379
+      - REDIS_EVENTS_CHANNEL=events
       - AUTH_JWT_SECRET=$AUTH_JWT_SECRET
       - PORT=3000
       - VERSION=local
@@ -959,24 +960,24 @@ services:
       - PUID=$PUID
       - PGID=$PGID
 
-  rediscommander:
-    container_name: rediscommander
-    image: rediscommander/redis-commander:latest
-    restart: always
-    networks:
-      internal: null
-      vpn-subnet:
-        ipv4_address: 20.20.10.6
-    depends_on:
-      - redis
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - REDIS_HOST=redis
-      - REDIS_PASSWORD=$REDIS_PASSWORD
+#  rediscommander:
+#    container_name: rediscommander
+#    image: rediscommander/redis-commander:latest
+#    restart: always
+#    networks:
+#      internal: null
+#      vpn-subnet:
+#        ipv4_address: 20.20.10.6
+#    depends_on:
+#      - redis
+#    security_opt:
+#      - no-new-privileges:true
+#    environment:
+#      - TZ=$TZ
+#      - PUID=$PUID
+#      - PGID=$PGID
+#      - REDIS_HOST=redis
+#      - REDIS_PASSWORD=$REDIS_PASSWORD
 
   restic:
     container_name: restic
