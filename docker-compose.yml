@@ -910,7 +910,7 @@ services:
 
   snext:
     container_name: snext
-    image: sentriz/standardnotes-extension-server:latest
+    image: sentriz/standardnotes-extensions:latest
     restart: unless-stopped
     command: start-local
     networks:
