@@ -983,7 +983,7 @@ services:
   restic:
     container_name: restic
     image: mazzolino/restic:latest
-    restart: always
+    restart: unless-stopped
     networks:
       - socket-proxy
       - internal
@@ -1017,8 +1017,8 @@ services:
       B2_ACCOUNT_ID: $B2_ACCOUNT_ID
       B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
       DOCKER_HOST: tcp://socket-proxy:2375
-      POST_COMMANDS_FAILURE: |-
-        curl -i -X GET "https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic Backup Failed"
+      POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Backup-Success'''
+      POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Backup-Failed'''
       PRE_COMMANDS: |-
         docker exec mariadb mysqldump -u root --password="$MYSQL_ROOT_PASSWORD" --all-databases > /source/dbbackups/mariadb_dump.sql
         docker exec postgres pg_dumpall -U $POSTGRES_USER > /source/dbbackups/postgres_dump.sql
@@ -1026,7 +1026,7 @@ services:
   restic-prune:
     container_name: restic-prune
     image: mazzolino/restic:latest
-    restart: always
+    restart: unless-stopped
     networks:
       - socket-proxy
       - internal
@@ -1046,13 +1046,48 @@ services:
       TZ: $TZ
       PUID: $PUID
       PGID: $PGID
-      PRUNE_CRON: "0 0 5 * * *"
+      RUN_ON_STARTUP: "false"
+      PRUNE_CRON: "0 0 7 * * *"
       RESTIC_REPOSITORY: b2:$B2_BUCKET:/restic
       RESTIC_PASSWORD_FILE: /run/secrets/restic_password
       B2_ACCOUNT_ID: $B2_ACCOUNT_ID
       B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
-      POST_COMMANDS_FAILURE: |-
-        curl -i -X GET "https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic Prune Failed"
+      POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Prune-Success'''
+      POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Prune-Failed'''
+
+  restic-check:
+    container_name: restic-check
+    image: mazzolino/restic:latest
+    restart: unless-stopped
+    networks:
+      - socket-proxy
+      - internal
+    depends_on:
+      - restic
+      - socket-proxy
+      - mariadb
+      - postgres
+    security_opt:
+      - no-new-privileges:true
+    secrets:
+      - restic_password
+    volumes:
+      - $DOCKERDIR:/source/data:ro
+      - $DOCKERDIR/restic:/source/dbbackups/
+    environment:
+      TZ: $TZ
+      PUID: $PUID
+      PGID: $PGID
+      RUN_ON_STARTUP: "false"
+      CHECK_CRON: "0 15 10 * * *"
+      RESTIC_CHECK_ARGS: >-
+        --read-data-subset=10%
+      RESTIC_REPOSITORY: b2:$B2_BUCKET:/restic
+      RESTIC_PASSWORD_FILE: /run/secrets/restic_password
+      B2_ACCOUNT_ID: $B2_ACCOUNT_ID
+      B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
+      POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Check-Success'''
+      POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Check-Failed'''
 
   meshcentral:
     container_name: meshcentral
