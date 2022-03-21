@@ -1017,7 +1017,7 @@ services:
       B2_ACCOUNT_ID: $B2_ACCOUNT_ID
       B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
       DOCKER_HOST: tcp://socket-proxy:2375
-      POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Backup-Success'''
+      #POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Backup-Success'''
       POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Backup-Failed'''
       PRE_COMMANDS: |-
         docker exec mariadb mysqldump -u root --password="$MYSQL_ROOT_PASSWORD" --all-databases > /source/dbbackups/mariadb_dump.sql
@@ -1028,11 +1028,9 @@ services:
     image: mazzolino/restic:latest
     restart: unless-stopped
     networks:
-      - socket-proxy
       - internal
     depends_on:
       - restic
-      - socket-proxy
       - mariadb
       - postgres
     security_opt:
@@ -1052,7 +1050,7 @@ services:
       RESTIC_PASSWORD_FILE: /run/secrets/restic_password
       B2_ACCOUNT_ID: $B2_ACCOUNT_ID
       B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
-      POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Prune-Success'''
+      #POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Prune-Success'''
       POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Prune-Failed'''
 
   restic-check:
@@ -1060,11 +1058,9 @@ services:
     image: mazzolino/restic:latest
     restart: unless-stopped
     networks:
-      - socket-proxy
       - internal
     depends_on:
       - restic
-      - socket-proxy
       - mariadb
       - postgres
     security_opt:
@@ -1086,7 +1082,7 @@ services:
       RESTIC_PASSWORD_FILE: /run/secrets/restic_password
       B2_ACCOUNT_ID: $B2_ACCOUNT_ID
       B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
-      POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Check-Success'''
+      #POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Check-Success'''
       POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Check-Failed'''
 
   meshcentral:
