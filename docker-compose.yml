@@ -3,18 +3,18 @@ version: "3.8"
 ########################### NETWORKS
 networks:
   traefik:
-    external:
-      name: traefik
+    name: traefik
+    external: true
   default:
     driver: bridge
   socket-proxy:
-    external:
-      name: socket-proxy
+    name: socket-proxy
+    external: true
   internal:
     external: false
   vpn-subnet:
-    external:
-      name: vpn-subnet
+    name: vpn-subnet
+    external: true
 
 ########################### SECRETS
 secrets:
