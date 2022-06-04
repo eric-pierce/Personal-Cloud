@@ -447,6 +447,7 @@ services:
       - no-new-privileges:true
     depends_on:
       - nextcloud
+      - redis
     volumes:
       - $DOCKERDIR/nextcloud:/var/www/html
     environment:
