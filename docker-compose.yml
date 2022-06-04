@@ -454,6 +454,8 @@ services:
       - TZ=$TZ
       - PUID=$PUID
       - PGID=$PGID
+      - REDIS_HOST=redis
+      - REDIS_HOST_PASSWORD=$REDIS_PASSWORD
 
   wireguard:
     container_name: wireguard
