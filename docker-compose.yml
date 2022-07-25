@@ -246,46 +246,6 @@ services:
       - POSTGRES_USER=$POSTGRES_USER
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_root_password
 
-  firefox-syncserver:
-    container_name: syncserver
-    image: mozilla/syncserver:1.9.1
-    restart: always
-    networks:
-      - traefik
-      - internal
-    depends_on:
-      - mariadb
-    secrets:
-      - firesync_secret
-    ports:
-      - "5000:5000"
-    security_opt:
-      - no-new-privileges:true
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - SYNCSERVER_PUBLIC_URL=https://firesync.$DOMAINNAME
-      - SYNCSERVER_SECRET_FILE=/run/secrets/firesync_secret
-      - SYNCSERVER_SQLURI=pymysql://ffsync:$MYSQL_FFSYNC_PASSWORD@mariadb/ffsync
-      - SYNCSERVER_BATCH_UPLOAD_ENABLED=true
-      - SYNCSERVER_FORCE_WSGI_ENVIRON=true
-      - SYNCSERVER_ALLOW_NEW_USER=false
-      - PORT=5000
-    labels:
-      - "traefik.enable=true"
-      ## HTTP Routers
-      - "traefik.http.routers.syncserver-rtr.entrypoints=https"
-      - "traefik.http.routers.syncserver-rtr.rule=Host(`firesync.$DOMAINNAME`)"
-      - "traefik.http.routers.syncserver-rtr.tls=true"
-      ## Middlewares
-      - "traefik.http.routers.syncserver-rtr.middlewares=chain-no-auth@file"
-      ## HTTP Services
-      - "traefik.http.routers.syncserver-rtr.service=syncserver-svc"
-      - "traefik.http.services.syncserver-svc.loadbalancer.server.port=5000"
-
   portainer:
     container_name: portainer
     image: portainer/portainer-ce:latest
@@ -633,9 +593,9 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     entrypoint: [
-      "./wait-for.sh", "mariadb", "3306",
-      "./wait-for.sh", "redis", "6379",
-      "./docker/entrypoint.sh", "start-web"
+      "./packages/syncing-server/wait-for.sh", "mariadb", "3306",
+      "./packages/syncing-server/wait-for.sh", "redis", "6379",
+      "./packages/syncing-server/docker/entrypoint.sh", "start-web"
     ]
     security_opt:
       - no-new-privileges:true
@@ -677,10 +637,10 @@ services:
       - redis
       - snsync
     entrypoint: [
-      "./wait-for.sh", "mariadb", "3306",
-      "./wait-for.sh", "redis", "6379",
-      "./wait-for.sh", "snsync", "3000",
-      "./docker/entrypoint.sh", "start-worker"
+      "./packages/syncing-server/wait-for.sh", "mariadb", "3306",
+      "./packages/syncing-server/wait-for.sh", "redis", "6379",
+      "./packages/syncing-server/wait-for.sh", "snsync", "3000",
+      "./packages/syncing-server/docker/entrypoint.sh", "start-worker"
     ]
     security_opt:
       - no-new-privileges:true
@@ -724,10 +684,10 @@ services:
     ports:
       - "127.0.0.1:3002:3002"
     entrypoint: [
-      "./wait-for.sh", "mariadb", "3306",
-      "./wait-for.sh", "redis", "6379",
-      "./wait-for.sh", "snsync", "3000",
-      "./docker/entrypoint.sh", "start-web"
+      "./packages/auth/wait-for.sh", "mariadb", "3306",
+      "./packages/auth/wait-for.sh", "redis", "6379",
+      "./packages/auth/wait-for.sh", "snsync", "3000",
+      "./packages/auth/docker/entrypoint.sh", "start-web"
     ]
     security_opt:
       - no-new-privileges:true
@@ -777,10 +737,10 @@ services:
       - redis
       - snauth
     entrypoint: [
-      "./wait-for.sh", "mariadb", "3306",
-      "./wait-for.sh", "redis", "6379",
-      "./wait-for.sh", "snauth", "3002",
-      "./docker/entrypoint.sh", "start-worker"
+      "./packages/auth/wait-for.sh", "mariadb", "3306",
+      "./packages/auth/wait-for.sh", "redis", "6379",
+      "./packages/auth/wait-for.sh", "snauth", "3002",
+      "./packages/auth/docker/entrypoint.sh", "start-worker"
     ]
     security_opt:
       - no-new-privileges:true
@@ -831,10 +791,10 @@ services:
       - snauth
       - redis
     entrypoint: [
-      "./wait-for.sh", "snauth", "3002",
-      "./wait-for.sh", "redis", "6379",
-      "./wait-for.sh", "snsync", "3000",
-      "./docker/entrypoint.sh", "start-web"
+      "./packages/api-gateway/wait-for.sh", "snauth", "3002",
+      "./packages/api-gateway/wait-for.sh", "redis", "6379",
+      "./packages/api-gateway/wait-for.sh", "snsync", "3000",
+      "./packages/api-gateway/docker/entrypoint.sh", "start-web"
     ]
     ports:
       - 8007:3000
