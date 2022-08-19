@@ -619,7 +619,7 @@ services:
       - NEW_RELIC_ENABLED=false
       - NEW_RELIC_APP_NAME=Sync
       - NEW_RELIC_NO_CONFIG_FILE=true
-      - REDIS_URL=redis://redis:$REDIS_PASSWORD@redis:6379
+      - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
       - REDIS_EVENTS_CHANNEL=events
       - AUTH_SERVER_URL=http://snauth:3002
       - EMAIL_ATTACHMENT_MAX_BYTE_SIZE=10485760
@@ -664,7 +664,7 @@ services:
       - NEW_RELIC_ENABLED=false
       - NEW_RELIC_APP_NAME=SyncWorker
       - NEW_RELIC_NO_CONFIG_FILE=true
-      - REDIS_URL=redis://redis:$REDIS_PASSWORD@redis:6379
+      - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
       - REDIS_EVENTS_CHANNEL=events
       - AUTH_SERVER_URL=http://snauth:3002
       - EMAIL_ATTACHMENT_MAX_BYTE_SIZE=10485760
@@ -722,7 +722,7 @@ services:
       - DB_PASSWORD=$MYSQL_STANDARDNOTES_PASSWORD
       - DB_DEBUG_LEVEL=all
       - DB_MIGRATIONS_PATH=dist/migrations/*.js
-      - REDIS_URL=redis://redis:$REDIS_PASSWORD@redis:6379
+      - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
       - DISABLE_USER_REGISTRATION=true
       - VERSION=local
 
@@ -775,7 +775,7 @@ services:
       - DB_PASSWORD=$MYSQL_STANDARDNOTES_PASSWORD
       - DB_DEBUG_LEVEL=all
       - DB_MIGRATIONS_PATH=dist/migrations/*.js
-      - REDIS_URL=redis://redis:$REDIS_PASSWORD@redis:6379
+      - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
       - DISABLE_USER_REGISTRATION=true
       - VERSION=local
 
@@ -812,7 +812,7 @@ services:
       - SYNCING_SERVER_JS_URL=http://snsync:3000
       - PAYMENTS_SERVER_URL=https://snext.$DOMAINNAME
       - AUTH_SERVER_URL=http://snauth:3002
-      - REDIS_URL=redis://redis:$REDIS_PASSWORD@redis:6379
+      - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
       - REDIS_EVENTS_CHANNEL=events
       - AUTH_JWT_SECRET=$AUTH_JWT_SECRET
       - PORT=3000
