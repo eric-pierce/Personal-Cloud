@@ -817,6 +817,7 @@ services:
       - AUTH_JWT_SECRET=$AUTH_JWT_SECRET
       - PORT=3000
       - VERSION=local
+      - WORKSPACE_SERVER_URL=http://workspace:3000
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
