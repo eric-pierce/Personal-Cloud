@@ -467,7 +467,7 @@ services:
       - TTRSS_DB_NAME=ttrss
       - TTRSS_DB_USER=ttrss
       - TTRSS_DB_PASS=$POSTGRES_TTRSS_PASSWORD
-      - TTRSS_SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss/
+      - TTRSS_SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss
 
   ttrss-updater:
     container_name: ttrss-updater
@@ -490,7 +490,7 @@ services:
       - TTRSS_DB_NAME=ttrss
       - TTRSS_DB_USER=ttrss
       - TTRSS_DB_PASS=$POSTGRES_TTRSS_PASSWORD
-      - TTRSS_SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss/
+      - TTRSS_SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss
     command: /opt/tt-rss/updater.sh
 
   ttrss:
