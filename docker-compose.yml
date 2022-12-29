@@ -982,7 +982,7 @@ services:
       B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
       DOCKER_HOST: tcp://socket-proxy:2375
       #POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Backup-Success'''
-      POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=$DOMAINNAME_Restic-Backup-Failed'''
+      POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=$DOMAINNAME-Restic-Backup-Failed'''
       PRE_COMMANDS: |-
         docker exec mariadb mysqldump -u root --password="$MYSQL_ROOT_PASSWORD" --all-databases > /source/dbbackups/mariadb_dump.sql
         docker exec postgres pg_dumpall -U $POSTGRES_USER > /source/dbbackups/postgres_dump.sql
@@ -1015,7 +1015,7 @@ services:
       B2_ACCOUNT_ID: $B2_ACCOUNT_ID
       B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
       #POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Prune-Success'''
-      POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=$DOMAINNAME_Restic-Prune-Failed'''
+      POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=$DOMAINNAME-Restic-Prune-Failed'''
 
   restic-check:
     container_name: restic-check
@@ -1047,7 +1047,7 @@ services:
       B2_ACCOUNT_ID: $B2_ACCOUNT_ID
       B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
       #POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Check-Success'''
-      POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=$DOMAINNAME_Restic-Check-Failed'''
+      POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=$DOMAINNAME-Restic-Check-Failed'''
 
   meshcentral:
     container_name: meshcentral
