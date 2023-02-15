@@ -593,9 +593,9 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     entrypoint: [
-      "./packages/syncing-server/wait-for.sh", "mariadb", "3306",
-      "./packages/syncing-server/wait-for.sh", "redis", "6379",
-      "./packages/syncing-server/docker/entrypoint.sh", "start-web"
+      "./wait-for.sh", "mariadb", "3306",
+      "./wait-for.sh", "redis", "6379",
+      "./docker/entrypoint.sh", "start-web"
     ]
     security_opt:
       - no-new-privileges:true
@@ -625,6 +625,17 @@ services:
       - EMAIL_ATTACHMENT_MAX_BYTE_SIZE=10485760
       - REVISIONS_FREQUENCY=300
       - VERSION=local
+      - SNS_TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:syncing-server-local-topic"
+      - SNS_ENDPOINT="http://localstack:4566"
+      - SNS_DISABLE_SSL=true
+      - SNS_SECRET_ACCESS_KEY="x"
+      - SNS_ACCESS_KEY_ID="x"
+      - SNS_AWS_REGION="us-east-1"
+      - SQS_QUEUE_URL="http://localstack:4566/000000000000/syncing-server-local-queue"
+      - SQS_AWS_REGION="us-east-1"
+      - SQS_ACCESS_KEY_ID="x"
+      - SQS_SECRET_ACCESS_KEY="x"
+      - SQS_ENDPOINT="http://localstack:4566"
 
   snsync-worker:
     container_name: snsync-worker
@@ -637,10 +648,10 @@ services:
       - redis
       - snsync
     entrypoint: [
-      "./packages/syncing-server/wait-for.sh", "mariadb", "3306",
-      "./packages/syncing-server/wait-for.sh", "redis", "6379",
-      "./packages/syncing-server/wait-for.sh", "snsync", "3000",
-      "./packages/syncing-server/docker/entrypoint.sh", "start-worker"
+      "./wait-for.sh", "mariadb", "3306",
+      "./wait-for.sh", "redis", "6379",
+      "./wait-for.sh", "snsync", "3000",
+      "./docker/entrypoint.sh", "start-worker"
     ]
     security_opt:
       - no-new-privileges:true
@@ -670,6 +681,17 @@ services:
       - EMAIL_ATTACHMENT_MAX_BYTE_SIZE=10485760
       - REVISIONS_FREQUENCY=300
       - VERSION=local
+      - SNS_TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:syncing-server-local-topic"
+      - SNS_ENDPOINT="http://localstack:4566"
+      - SNS_DISABLE_SSL=true
+      - SNS_SECRET_ACCESS_KEY="x"
+      - SNS_ACCESS_KEY_ID="x"
+      - SNS_AWS_REGION="us-east-1"
+      - SQS_QUEUE_URL="http://localstack:4566/000000000000/syncing-server-local-queue"
+      - SQS_AWS_REGION="us-east-1"
+      - SQS_ACCESS_KEY_ID="x"
+      - SQS_SECRET_ACCESS_KEY="x"
+      - SQS_ENDPOINT="http://localstack:4566"
 
   snauth:
     container_name: snauth
@@ -684,10 +706,10 @@ services:
     ports:
       - "127.0.0.1:3002:3002"
     entrypoint: [
-      "./packages/auth/wait-for.sh", "mariadb", "3306",
-      "./packages/auth/wait-for.sh", "redis", "6379",
-      "./packages/auth/wait-for.sh", "snsync", "3000",
-      "./packages/auth/docker/entrypoint.sh", "start-web"
+      "./wait-for.sh", "mariadb", "3306",
+      "./wait-for.sh", "redis", "6379",
+      "./wait-for.sh", "snsync", "3000",
+      "./docker/entrypoint.sh", "start-web"
     ]
     security_opt:
       - no-new-privileges:true
@@ -725,6 +747,17 @@ services:
       - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
       - DISABLE_USER_REGISTRATION=true
       - VERSION=local
+      - SNS_TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:syncing-server-local-topic"
+      - SNS_ENDPOINT="http://localstack:4566"
+      - SNS_DISABLE_SSL=true
+      - SNS_SECRET_ACCESS_KEY="x"
+      - SNS_ACCESS_KEY_ID="x"
+      - SNS_AWS_REGION="us-east-1"
+      - SQS_QUEUE_URL="http://localstack:4566/000000000000/syncing-server-local-queue"
+      - SQS_AWS_REGION="us-east-1"
+      - SQS_ACCESS_KEY_ID="x"
+      - SQS_SECRET_ACCESS_KEY="x"
+      - SQS_ENDPOINT="http://localstack:4566"
 
   snauth-worker:
     container_name: snauth-worker
@@ -737,10 +770,10 @@ services:
       - redis
       - snauth
     entrypoint: [
-      "./packages/auth/wait-for.sh", "mariadb", "3306",
-      "./packages/auth/wait-for.sh", "redis", "6379",
-      "./packages/auth/wait-for.sh", "snauth", "3002",
-      "./packages/auth/docker/entrypoint.sh", "start-worker"
+      "./wait-for.sh", "mariadb", "3306",
+      "./wait-for.sh", "redis", "6379",
+      "./wait-for.sh", "snauth", "3002",
+      "./docker/entrypoint.sh", "start-worker"
     ]
     security_opt:
       - no-new-privileges:true
@@ -778,6 +811,17 @@ services:
       - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
       - DISABLE_USER_REGISTRATION=true
       - VERSION=local
+      - SNS_TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:syncing-server-local-topic"
+      - SNS_ENDPOINT="http://localstack:4566"
+      - SNS_DISABLE_SSL=true
+      - SNS_SECRET_ACCESS_KEY="x"
+      - SNS_ACCESS_KEY_ID="x"
+      - SNS_AWS_REGION="us-east-1"
+      - SQS_QUEUE_URL="http://localstack:4566/000000000000/syncing-server-local-queue"
+      - SQS_AWS_REGION="us-east-1"
+      - SQS_ACCESS_KEY_ID="x"
+      - SQS_SECRET_ACCESS_KEY="x"
+      - SQS_ENDPOINT="http://localstack:4566"
 
   snapi:
     container_name: snapi
@@ -791,10 +835,10 @@ services:
       - snauth
       - redis
     entrypoint: [
-      "./packages/api-gateway/wait-for.sh", "snauth", "3002",
-      "./packages/api-gateway/wait-for.sh", "redis", "6379",
-      "./packages/api-gateway/wait-for.sh", "snsync", "3000",
-      "./packages/api-gateway/docker/entrypoint.sh", "start-web"
+      "./wait-for.sh", "snauth", "3002",
+      "./wait-for.sh", "redis", "6379",
+      "./wait-for.sh", "snsync", "3000",
+      "./docker/entrypoint.sh", "start-web"
     ]
     ports:
       - 8007:3000
@@ -818,6 +862,17 @@ services:
       - PORT=3000
       - VERSION=local
       - WORKSPACE_SERVER_URL=http://workspace:3000
+      - SNS_TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:syncing-server-local-topic"
+      - SNS_ENDPOINT="http://localstack:4566"
+      - SNS_DISABLE_SSL=true
+      - SNS_SECRET_ACCESS_KEY="x"
+      - SNS_ACCESS_KEY_ID="x"
+      - SNS_AWS_REGION="us-east-1"
+      - SQS_QUEUE_URL="http://localstack:4566/000000000000/syncing-server-local-queue"
+      - SQS_AWS_REGION="us-east-1"
+      - SQS_ACCESS_KEY_ID="x"
+      - SQS_SECRET_ACCESS_KEY="x"
+      - SQS_ENDPOINT="http://localstack:4566"
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
