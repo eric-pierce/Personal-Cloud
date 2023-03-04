@@ -580,299 +580,60 @@ services:
       - "traefik.http.routers.vaultwarden-ws-rtr.service=vaultwarden-ws-svc"
       - "traefik.http.services.vaultwarden-ws-svc.loadbalancer.server.port=3012"
 
-  snsync:
-    container_name: snsync
-    image: standardnotes/syncing-server-js:latest
-    restart: unless-stopped
-    networks:
-      - internal
-    depends_on:
-      - mariadb
-      - redis
-      - snext
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
     ports:
-      - "127.0.0.1:3000:3000"
-    entrypoint: [
-      "./wait-for.sh", "mariadb", "3306",
-      "./wait-for.sh", "redis", "6379",
-      "./docker/entrypoint.sh", "start-web"
-    ]
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - LOG_LEVEL=info
-      - NODE_ENV=development
-      - AUTH_JWT_SECRET=$AUTH_JWT_SECRET
-      - EXPOSED_PORT=8007
-      - PORT=3000
-      - DB_PORT=3306
-      - DB_HOST=mariadb
-      - DB_REPLICA_HOST=mariadb
-      - DB_DATABASE=standardnotes
-      - DB_USERNAME=standardnotes
-      - DB_PASSWORD=$MYSQL_STANDARDNOTES_PASSWORD
-      - DB_DEBUG_LEVEL=all
-      - DB_MIGRATIONS_PATH=dist/migrations/*.js
-      - NEW_RELIC_ENABLED=false
-      - NEW_RELIC_APP_NAME=Sync
-      - NEW_RELIC_NO_CONFIG_FILE=true
-      - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
-      - REDIS_EVENTS_CHANNEL=events
-      - AUTH_SERVER_URL=http://snauth:3002
-      - EMAIL_ATTACHMENT_MAX_BYTE_SIZE=10485760
-      - REVISIONS_FREQUENCY=300
-      - VERSION=local
-      - SNS_TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:syncing-server-local-topic"
-      - SNS_ENDPOINT="http://localstack:4566"
-      - SNS_DISABLE_SSL=true
-      - SNS_SECRET_ACCESS_KEY="x"
-      - SNS_ACCESS_KEY_ID="x"
-      - SNS_AWS_REGION="us-east-1"
-      - SQS_QUEUE_URL="http://localstack:4566/000000000000/syncing-server-local-queue"
-      - SQS_AWS_REGION="us-east-1"
-      - SQS_ACCESS_KEY_ID="x"
-      - SQS_SECRET_ACCESS_KEY="x"
-      - SQS_ENDPOINT="http://localstack:4566"
-
-  snsync-worker:
-    container_name: snsync-worker
-    image: standardnotes/syncing-server-js:latest
+      - "127.0.0.1:4566:4566"
     restart: unless-stopped
+    environment:
+      - SERVICES=sns,sqs
+      - HOSTNAME_EXTERNAL=localstack
+      - LS_LOG=warn
+    volumes:
+      - $DOCKERDIR/localstack/localstack_bootstrap.sh:/etc/localstack/init/ready.d/localstack_bootstrap.sh
     networks:
       - internal
-    depends_on:
-      - mariadb
-      - redis
-      - snsync
-    entrypoint: [
-      "./wait-for.sh", "mariadb", "3306",
-      "./wait-for.sh", "redis", "6379",
-      "./wait-for.sh", "snsync", "3000",
-      "./docker/entrypoint.sh", "start-worker"
-    ]
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - LOG_LEVEL=info
-      - NODE_ENV=development
-      - AUTH_JWT_SECRET=$AUTH_JWT_SECRET
-      - EXPOSED_PORT=8007
-      - PORT=3000
-      - DB_PORT=3306
-      - DB_HOST=mariadb
-      - DB_REPLICA_HOST=mariadb
-      - DB_DATABASE=standardnotes
-      - DB_USERNAME=standardnotes
-      - DB_PASSWORD=$MYSQL_STANDARDNOTES_PASSWORD
-      - DB_DEBUG_LEVEL=all
-      - DB_MIGRATIONS_PATH=dist/migrations/*.js
-      - NEW_RELIC_ENABLED=false
-      - NEW_RELIC_APP_NAME=SyncWorker
-      - NEW_RELIC_NO_CONFIG_FILE=true
-      - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
-      - REDIS_EVENTS_CHANNEL=events
-      - AUTH_SERVER_URL=http://snauth:3002
-      - EMAIL_ATTACHMENT_MAX_BYTE_SIZE=10485760
-      - REVISIONS_FREQUENCY=300
-      - VERSION=local
-      - SNS_TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:syncing-server-local-topic"
-      - SNS_ENDPOINT="http://localstack:4566"
-      - SNS_DISABLE_SSL=true
-      - SNS_SECRET_ACCESS_KEY="x"
-      - SNS_ACCESS_KEY_ID="x"
-      - SNS_AWS_REGION="us-east-1"
-      - SQS_QUEUE_URL="http://localstack:4566/000000000000/syncing-server-local-queue"
-      - SQS_AWS_REGION="us-east-1"
-      - SQS_ACCESS_KEY_ID="x"
-      - SQS_SECRET_ACCESS_KEY="x"
-      - SQS_ENDPOINT="http://localstack:4566"
 
-  snauth:
-    container_name: snauth
-    image: standardnotes/auth:latest
-    restart: unless-stopped
-    networks:
-      - internal
-    depends_on:
-      - mariadb
-      - redis
-      - snsync
-    ports:
-      - "127.0.0.1:3002:3002"
-    entrypoint: [
-      "./wait-for.sh", "mariadb", "3306",
-      "./wait-for.sh", "redis", "6379",
-      "./wait-for.sh", "snsync", "3000",
-      "./docker/entrypoint.sh", "start-web"
-    ]
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - LOG_LEVEL=info
-      - NODE_ENV=production
-      - PORT=3002
-      - JWT_SECRET=$JWT_SECRET
-      - LEGACY_JWT_SECRET=$LEGACY_JWT_SECRET
-      - PSEUDO_KEY_PARAMS_KEY=$PSEUDO_KEY_PARAMS_KEY
-      - ENCRYPTION_SERVER_KEY=$ENCRYPTION_SERVER_KEY
-      - AUTH_JWT_SECRET=$AUTH_JWT_SECRET
-      - SYNCING_SERVER_URL=http://snsync:3000
-      - NEW_RELIC_ENABLED=false
-      - NEW_RELIC_APP_NAME=Auth
-      - NEW_RELIC_NO_CONFIG_FILE=true
-      - REDIS_EVENTS_CHANNEL=auth-events
-      - AUTH_JWT_TTL=60000
-      - ACCESS_TOKEN_AGE=5184000
-      - REFRESH_TOKEN_AGE=31556926
-      - MAX_LOGIN_ATTEMPTS=6
-      - FAILED_LOGIN_LOCKOUT=3600
-      - EPHEMERAL_SESSION_AGE=259200
-      - DB_PORT=3306
-      - DB_HOST=mariadb
-      - DB_REPLICA_HOST=mariadb
-      - DB_DATABASE=standardnotes
-      - DB_USERNAME=standardnotes
-      - DB_PASSWORD=$MYSQL_STANDARDNOTES_PASSWORD
-      - DB_DEBUG_LEVEL=all
-      - DB_MIGRATIONS_PATH=dist/migrations/*.js
-      - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
-      - DISABLE_USER_REGISTRATION=true
-      - VERSION=local
-      - SNS_TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:syncing-server-local-topic"
-      - SNS_ENDPOINT="http://localstack:4566"
-      - SNS_DISABLE_SSL=true
-      - SNS_SECRET_ACCESS_KEY="x"
-      - SNS_ACCESS_KEY_ID="x"
-      - SNS_AWS_REGION="us-east-1"
-      - SQS_QUEUE_URL="http://localstack:4566/000000000000/syncing-server-local-queue"
-      - SQS_AWS_REGION="us-east-1"
-      - SQS_ACCESS_KEY_ID="x"
-      - SQS_SECRET_ACCESS_KEY="x"
-      - SQS_ENDPOINT="http://localstack:4566"
-
-  snauth-worker:
-    container_name: snauth-worker
-    image: standardnotes/auth:latest
-    restart: unless-stopped
-    networks:
-      - internal
-    depends_on:
-      - mariadb
-      - redis
-      - snauth
-    entrypoint: [
-      "./wait-for.sh", "mariadb", "3306",
-      "./wait-for.sh", "redis", "6379",
-      "./wait-for.sh", "snauth", "3002",
-      "./docker/entrypoint.sh", "start-worker"
-    ]
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - LOG_LEVEL=info
-      - NODE_ENV=production
-      - PORT=3002
-      - JWT_SECRET=$JWT_SECRET
-      - LEGACY_JWT_SECRET=$LEGACY_JWT_SECRET
-      - PSEUDO_KEY_PARAMS_KEY=$PSEUDO_KEY_PARAMS_KEY
-      - ENCRYPTION_SERVER_KEY=$ENCRYPTION_SERVER_KEY
-      - AUTH_JWT_SECRET=$AUTH_JWT_SECRET
-      - SYNCING_SERVER_URL=http://snsync:3000
-      - NEW_RELIC_ENABLED=false
-      - NEW_RELIC_APP_NAME=AuthWorker
-      - NEW_RELIC_NO_CONFIG_FILE=true
-      - REDIS_EVENTS_CHANNEL=auth-events
-      - AUTH_JWT_TTL=60000
-      - ACCESS_TOKEN_AGE=5184000
-      - REFRESH_TOKEN_AGE=31556926
-      - MAX_LOGIN_ATTEMPTS=6
-      - FAILED_LOGIN_LOCKOUT=3600
-      - EPHEMERAL_SESSION_AGE=259200
-      - DB_PORT=3306
-      - DB_HOST=mariadb
-      - DB_REPLICA_HOST=mariadb
-      - DB_DATABASE=standardnotes
-      - DB_USERNAME=standardnotes
-      - DB_PASSWORD=$MYSQL_STANDARDNOTES_PASSWORD
-      - DB_DEBUG_LEVEL=all
-      - DB_MIGRATIONS_PATH=dist/migrations/*.js
-      - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
-      - DISABLE_USER_REGISTRATION=true
-      - VERSION=local
-      - SNS_TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:syncing-server-local-topic"
-      - SNS_ENDPOINT="http://localstack:4566"
-      - SNS_DISABLE_SSL=true
-      - SNS_SECRET_ACCESS_KEY="x"
-      - SNS_ACCESS_KEY_ID="x"
-      - SNS_AWS_REGION="us-east-1"
-      - SQS_QUEUE_URL="http://localstack:4566/000000000000/syncing-server-local-queue"
-      - SQS_AWS_REGION="us-east-1"
-      - SQS_ACCESS_KEY_ID="x"
-      - SQS_SECRET_ACCESS_KEY="x"
-      - SQS_ENDPOINT="http://localstack:4566"
-
-  snapi:
-    container_name: snapi
-    image: standardnotes/api-gateway:latest
+  snserver:
+    container_name: snserver
+    image: standardnotes/server:latest
     restart: unless-stopped
     networks:
       - traefik
       - internal
     depends_on:
-      - snsync
-      - snauth
+      - mariadb
       - redis
-    entrypoint: [
-      "./wait-for.sh", "snauth", "3002",
-      "./wait-for.sh", "redis", "6379",
-      "./wait-for.sh", "snsync", "3000",
-      "./docker/entrypoint.sh", "start-web"
-    ]
+      - snext
+      - localstack
     ports:
       - 8007:3000
+      - 8012:3104
+    volumes:
+      - $DOCKERDIR/snserver/logs:/var/lib/server/logs
+      - $DOCKERDIR/snserver/uploads:/opt/bundled/files/packages/files/dist/uploads
+      - $DOCKERDIR/snserver/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh
     security_opt:
       - no-new-privileges:true
     environment:
       - TZ=$TZ
       - PUID=$PUID
       - PGID=$PGID
-      - LOG_LEVEL=info
-      - NODE_ENV=production
-      - NEW_RELIC_ENABLED=false
-      - NEW_RELIC_APP_NAME=APIGateway
-      - NEW_RELIC_NO_CONFIG_FILE=true
-      - SYNCING_SERVER_JS_URL=http://snsync:3000
-      - PAYMENTS_SERVER_URL=https://snext.$DOMAINNAME
-      - AUTH_SERVER_URL=http://snauth:3002
+      - DB_PORT=3306
+      - DB_HOST=mariadb
+      - DB_DATABASE=standardnotes
+      - DB_USERNAME=standardnotes
+      - DB_PASSWORD=$MYSQL_STANDARDNOTES_PASSWORD
+      - DB_DEBUG_LEVEL=all
       - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
-      - REDIS_EVENTS_CHANNEL=events
-      - AUTH_JWT_SECRET=$AUTH_JWT_SECRET
-      - PORT=3000
-      - VERSION=local
-      - WORKSPACE_SERVER_URL=http://workspace:3000
-      - SNS_TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:syncing-server-local-topic"
-      - SNS_ENDPOINT="http://localstack:4566"
-      - SNS_DISABLE_SSL=true
-      - SNS_SECRET_ACCESS_KEY="x"
-      - SNS_ACCESS_KEY_ID="x"
-      - SNS_AWS_REGION="us-east-1"
-      - SQS_QUEUE_URL="http://localstack:4566/000000000000/syncing-server-local-queue"
-      - SQS_AWS_REGION="us-east-1"
-      - SQS_ACCESS_KEY_ID="x"
-      - SQS_SECRET_ACCESS_KEY="x"
-      - SQS_ENDPOINT="http://localstack:4566"
+      - REDIS_PORT=6379
+      - REDIS_HOST=redis
+      - REDIS_HOST_PASSWORD=$REDIS_PASSWORD
+      - EXPOSED_PORT=8007
+      - EXPOSED_FILES_SERVER_PORT=8012
+      - DISABLE_USER_REGISTRATION=false
+      - NEW_RELIC_ENABLED=false
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
@@ -894,7 +655,7 @@ services:
     networks:
       - traefik
     depends_on:
-      - snsync
+      - snserver
     ports:
       - 8010:3001
     security_opt:
