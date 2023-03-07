@@ -613,7 +613,6 @@ services:
     volumes:
       - $DOCKERDIR/snserver/logs:/var/lib/server/logs
       - $DOCKERDIR/snserver/uploads:/opt/bundled/files/packages/files/dist/uploads
-      - $DOCKERDIR/snserver/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh
     security_opt:
       - no-new-privileges:true
     environment:
