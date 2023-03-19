@@ -1,4 +1,4 @@
-version: "3.8"
+version: "3.9"
 
 ########################### NETWORKS
 networks:
@@ -633,6 +633,9 @@ services:
       - EXPOSED_FILES_SERVER_PORT=8012
       - DISABLE_USER_REGISTRATION=false
       - NEW_RELIC_ENABLED=false
+      - AUTH_JWT_SECRET=$AUTH_JWT_SECRET
+      - AUTH_SERVER_ENCRYPTION_SERVER_KEY=$AUTH_SERVER_ENCRYPTION_SERVER_KEY
+      - VALET_TOKEN_SECRET=$VALET_TOKEN_SECRET
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
