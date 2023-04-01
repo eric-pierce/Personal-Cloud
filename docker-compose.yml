@@ -291,7 +291,6 @@ services:
   pma:
     container_name: phpmyadmin
     image: phpmyadmin/phpmyadmin:latest
-    container_name: phpmyadmin
     restart: unless-stopped
     networks:
       internal: null
@@ -649,35 +648,73 @@ services:
       - "traefik.http.routers.notesync-rtr.service=notesync-svc"
       - "traefik.http.services.notesync-svc.loadbalancer.server.port=3000"
 
-  standardnotes:
-    container_name: standardnotes
-    image: standardnotes/web:stable
+#  standardnotes:
+#    container_name: standardnotes
+#    image: standardnotes/web:stable
+#    restart: unless-stopped
+#    command: start
+#    networks:
+#      - traefik
+#    depends_on:
+#      - snserver
+#    ports:
+#      - 8010:3001
+#    security_opt:
+#      - no-new-privileges:true
+#    environment:
+#      - TZ=$TZ
+#      - PUID=$PUID
+#      - PGID=$PGID
+#      - RAILS_ENV=development
+#      - PORT=3001
+#      - WEB_CONCURRENCY=0
+#      - SECRET_KEY_BASE=$STANDARD_NOTES_SECRET
+#      - APP_HOST=https://notes.$DOMAINNAME
+#      - RAILS_SERVE_STATIC_FILES=true
+#      - RAILS_LOG_TO_STDOUT=true
+#      - RAILS_LOG_LEVEL=INFO
+#      - DEFAULT_SYNC_SERVER=https://notesync.$DOMAINNAME
+#      - DEV_DEFAULT_SYNC_SERVER=https://notesync.$DOMAINNAME
+#      - DATADOG_ENABLED=false
+#      - ENABLE_UNFINISHED_FEATURES=false
+#    labels:
+#      - "traefik.enable=true"
+#      ## HTTP Routers
+#      - "traefik.http.routers.notes-rtr.entrypoints=https"
+#      - "traefik.http.routers.notes-rtr.rule=Host(`notes.$DOMAINNAME`)"
+#      - "traefik.http.routers.notes-rtr.tls=true"
+#      ## Middlewares
+#      - "traefik.http.routers.notes-rtr.middlewares=chain-no-auth@file"
+#      ## HTTP Services
+#      - "traefik.http.routers.notes-rtr.service=notes-svc"
+#      - "traefik.http.services.notes-svc.loadbalancer.server.port=3001"
+
+  snui:
+    container_name: snui
+    image: ghcr.io/jackyzy823/standardnotes-web:3.150.33
     restart: unless-stopped
-    command: start
     networks:
       - traefik
     depends_on:
       - snserver
     ports:
-      - 8010:3001
+      - 8010:80
     security_opt:
       - no-new-privileges:true
     environment:
       - TZ=$TZ
       - PUID=$PUID
       - PGID=$PGID
-      - RAILS_ENV=development
-      - PORT=3001
-      - WEB_CONCURRENCY=0
-      - SECRET_KEY_BASE=$STANDARD_NOTES_SECRET
+      - PORT=80
       - APP_HOST=https://notes.$DOMAINNAME
-      - RAILS_SERVE_STATIC_FILES=true
-      - RAILS_LOG_TO_STDOUT=true
-      - RAILS_LOG_LEVEL=INFO
       - DEFAULT_SYNC_SERVER=https://notesync.$DOMAINNAME
-      - DEV_DEFAULT_SYNC_SERVER=https://notesync.$DOMAINNAME
-      - DATADOG_ENABLED=false
+      - DEFAULT_FILES_HOST=https://notesync.$DOMAINNAME
       - ENABLE_UNFINISHED_FEATURES=false
+      - PURCHASE_URL=https://notes.$DOMAINNAME
+      - WEBSOCKET_URL=https://notes.$DOMAINNAME
+      - PLANS_URL=https://notes.$DOMAINNAME
+      - DASHBOARD_URL=https://notes.$DOMAINNAME
+      - SECRET_KEY_BASE=$STANDARD_NOTES_SECRET
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
@@ -688,7 +725,7 @@ services:
       - "traefik.http.routers.notes-rtr.middlewares=chain-no-auth@file"
       ## HTTP Services
       - "traefik.http.routers.notes-rtr.service=notes-svc"
-      - "traefik.http.services.notes-svc.loadbalancer.server.port=3001"
+      - "traefik.http.services.notes-svc.loadbalancer.server.port=80"
 
   snext:
     container_name: snext
