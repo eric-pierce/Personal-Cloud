@@ -691,7 +691,7 @@ services:
 
   snui:
     container_name: snui
-    image: ghcr.io/jackyzy823/standardnotes-web:3.150.33
+    image: ghcr.io/jackyzy823/standardnotes-web:latest
     restart: unless-stopped
     networks:
       - traefik
