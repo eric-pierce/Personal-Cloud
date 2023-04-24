@@ -45,9 +45,6 @@ Everything except fail2ban on my Contabo VPS are sourced from docker images.
 * [Wireguard](https://github.com/linuxserver/docker-wireguard) \- allows me to access internal services via VPN. This is one of the few "unofficial" images as I don't think wireguard hosts an official one
 * [Tiny-Tiny-RSS](https://tt-rss.org/) (Postgres) - Last year the developer created official docker images, so I moved from an unofficially maintained one to the official ones. This consists of a backend and frontend component, as well as an updater cron job. I much prefer this approach as the unofficial image wasn't static, and was just an older docker image that pulled the latest version of the app from Git.
 * [Vaultwarden](https://github.com/dani-garcia/vaultwarden) (Postgres) - This is the unofficial bitwarden api/backend/frontend implementation in Rust. I moved from the default sqlite backend to a postgres backend and found that it is now much speedier when updating folders
-* [Standardnotes Sync Server](https://github.com/standardnotes/standalone) (MariaDB) \- This is the official backend implementation for standardnotes. I was using the Nextcloud Notes before, but wasn't happy with the mobile app experience (manual sync over webdav in the Notebooks app). The official iOS app is just as seamless as the native iPhone notes app. This backend server was recently re-written in JavaScript (previously Ruby on Rails). I am not using the recommended "script" based implementation here as I prefer more control over containers and architecture, so I've implemented the standalone containers directly in my docker-compose file.
-* [Standardnotes Web App](https://github.com/standardnotes/web) \- the web frontend for standardnotes
-* [Standardnotes Extensions](https://github.com/eric-pierce/standardnotes-extension-server) \- This is a docker image which contains all the open source extensions for standardnotes. It's very simple to run, and lets you use several high powered extensions all self-hosted. I forked this and added additional themes and services.
 * [MeshCentral](https://github.com/Ylianst/MeshCentral) \- This is a complete replacement for TeamViewer, and enables remote access to my devices without needing to use a third party service. The only downside I've found here is that there isn't a native mobile app.
 * [Tandoor Recipes](https://github.com/vabene1111/recipes) \- App for self-hosting and sharing recipes. With family members spread out this is a great way to connect around favorite recipes and meal planning.
 
@@ -57,3 +54,9 @@ Services I'm considering adding in the future:
 * Papermerge
 * Monica CRM
 * fail2ban - may move it into a container
+
+Services Removed:
+
+* [Standardnotes Sync Server](https://github.com/standardnotes/server) (MariaDB) \- This is the official backend implementation for standardnotes. I was using the Nextcloud Notes before, but wasn't happy with the mobile app experience (manual sync over webdav in the Notebooks app). The official iOS app is just as seamless as the native iPhone notes app. This backend server was recently re-written in JavaScript (previously Ruby on Rails). I am not using the recommended "script" based implementation here as I prefer more control over containers and architecture, so I've implemented the standalone containers directly in my docker-compose file. I replace this with Obsidian + remotely_save community plugin to encrypt notes and sync to my Nextcloud over webdav
+* [Standardnotes Web App](https://github.com/standardnotes/web) \- the web frontend for standardnotes
+* [Standardnotes Extensions](https://github.com/eric-pierce/standardnotes-extension-server) \- This is a docker image which contains all the open source extensions for standardnotes. It's very simple to run, and lets you use several high powered extensions all self-hosted. I forked this and added additional themes and services.
