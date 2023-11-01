@@ -967,3 +967,46 @@ services:
       ## HTTP Services
       - "traefik.http.routers.tandoor-rtr.service=tandoor-svc"
       - "traefik.http.services.tandoor-svc.loadbalancer.server.port=80"
+
+#  freshrss:
+#    container_name: freshrss
+#    image: freshrss/freshrss:latest
+#    restart: always
+#    networks:
+#      - traefik
+#      - internal
+#    depends_on:
+#      - traefik
+#      - tandoor_backend
+#    ports:
+#      - 8088:80
+#    volumes:
+#      - $DOCKERDIR/freshrss/data:/var/www/FreshRSS/data
+#      - $DOCKERDIR/freshrss/extensions:/var/www/FreshRSS/extensions
+#    security_opt:
+#      - no-new-privileges:true
+#    environment:
+#      - TZ=$TZ
+#      - PUID=$PUID
+#      - PGID=$PGID
+#      - CRON_MIN=3,33
+#      - ADMIN_EMAIL=admin@example.net
+#      - PUBLISHED_PORT=80
+#      - ADMIN_PASSWORD=freshrss
+#      - ADMIN_API_PASSWORD=freshrss
+#      - BASE_URL=https://freshrss.$DOMAINNAME
+#      - DB_HOST=postgres
+#      - DB_BASE=freshrss
+#      - DB_USER=freshrss
+#      - DB_PASSWORD=$FRESHRSS_POSTGRES_PASSWORD
+#    labels:
+#      - "traefik.enable=true"
+#      ## HTTP Routers
+#      - "traefik.http.routers.freshrss-rtr.entrypoints=https"
+#      - "traefik.http.routers.freshrss-rtr.rule=Host(`freshrss.$DOMAINNAME`)"
+#      - "traefik.http.routers.freshrss-rtr.tls=true"
+#      ## Middlewares
+#      - "traefik.http.routers.freshrss-rtr.middlewares=chain-no-auth@file"
+#      ## HTTP Services
+#      - "traefik.http.routers.freshrss-rtr.service=freshrss-svc"
+#      - "traefik.http.services.freshrss-svc.loadbalancer.server.port=80"
