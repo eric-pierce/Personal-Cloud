@@ -459,14 +459,10 @@ services:
       - $DOCKERDIR/ttrss:/var/www/html
     environment:
       - TZ=$TZ
-      - OWNER_UID=$PUID
-      - OWNER_GID=$PGID
-      - TTRSS_DB_TYPE=pgsql
       - TTRSS_DB_HOST=postgres
       - TTRSS_DB_NAME=ttrss
       - TTRSS_DB_USER=ttrss
       - TTRSS_DB_PASS=$POSTGRES_TTRSS_PASSWORD
-      - TTRSS_SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss
 
   ttrss-updater:
     container_name: ttrss-updater
@@ -482,19 +478,15 @@ services:
       - $DOCKERDIR/ttrss:/var/www/html
     environment:
       - TZ=$TZ
-      - OWNER_UID=$PUID
-      - OWNER_GID=$PGID
-      - TTRSS_DB_TYPE=pgsql
       - TTRSS_DB_HOST=postgres
       - TTRSS_DB_NAME=ttrss
       - TTRSS_DB_USER=ttrss
       - TTRSS_DB_PASS=$POSTGRES_TTRSS_PASSWORD
-      - TTRSS_SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss
     command: /opt/tt-rss/updater.sh
 
   ttrss:
     container_name: ttrss
-    image: cthulhoo/ttrss-web:latest
+    image: cthulhoo/ttrss-web-nginx:latest
     restart: unless-stopped
     networks:
       - traefik
@@ -504,15 +496,12 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
-      - 8009:2015
+      - 8009:80
     volumes:
       - $DOCKERDIR/ttrss:/var/www/html:ro
     environment:
       - TZ=$TZ
-      - OWNER_UID=$PUID
-      - OWNER_GID=$PGID
-      - HTTP_HOST=localhost
-      - HTTP_PORT=2015
+      - HTTP_PORT=127.0.0.1:8280
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
@@ -523,7 +512,7 @@ services:
       - "traefik.http.routers.ttrss-rtr.middlewares=chain-no-auth@file"
       ## HTTP Services
       - "traefik.http.routers.ttrss-rtr.service=ttrss-svc"
-      - "traefik.http.services.ttrss-svc.loadbalancer.server.port=2015"
+      - "traefik.http.services.ttrss-svc.loadbalancer.server.port=80"
 
   vaultwarden:
     container_name: vaultwarden
