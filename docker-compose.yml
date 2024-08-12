@@ -37,7 +37,7 @@ secrets:
 services:
   traefik:
     container_name: traefik
-    image: traefik:latest
+    image: traefik:v2.11
     restart: unless-stopped
     command: # CLI arguments
       - --global.checkNewVersion=true
@@ -503,7 +503,7 @@ services:
       - $DOCKERDIR/ttrss:/var/www/html:ro
     environment:
       - TZ=$TZ
-      - HTTP_PORT=80
+      - HTTP_PORT=8009
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
@@ -789,7 +789,6 @@ services:
       #POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Backup-Success'''
       POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=$DOMAINNAME-Restic-Backup-Failed'''
       PRE_COMMANDS: |-
-        docker exec mariadb mysqldump -u root --password="$MYSQL_ROOT_PASSWORD" --all-databases > /source/dbbackups/mariadb_dump.sql
         docker exec postgres pg_dumpall -U $POSTGRES_USER > /source/dbbackups/postgres_dump.sql
 
   restic-prune:
@@ -958,6 +957,63 @@ services:
       ## HTTP Services
       - "traefik.http.routers.tandoor-rtr.service=tandoor-svc"
       - "traefik.http.services.tandoor-svc.loadbalancer.server.port=80"
+
+  vikunja:
+    container_name: vikunja
+    image: vikunja/vikunja:latest
+    restart: always
+    networks:
+      - traefik
+      - internal
+    depends_on:
+      - traefik
+      - postgres
+      - redis
+    ports:
+      - 8088:3456
+    volumes:
+      - $DOCKERDIR/vikunja:/app/vikunja/files
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=$TZ
+      - PUID=$PUID
+      - PGID=$PGID
+      - VIKUNJA_SERVICE_PUBLICURL=https://todo.$DOMAINNAME
+      - VIKUNJA_DATABASE_HOST=postgres
+      - VIKUNJA_DATABASE_PASSWORD=$VIKUNJA_POSTGRES_PASSWORD
+      - VIKUNJA_DATABASE_TYPE=postgres
+      - VIKUNJA_DATABASE_USER=vikunja
+      - VIKUNJA_DATABASE_DATABASE=vikunja
+      - VIKUNJA_SERVICE_JWTSECRET=$VIKUNJA_JWTSECRET
+      - VIKUNJA_SERVICE_ENABLEREGISTRATION=false
+      - VIKUNJA_SERVICE_TIMEZONE=$TZ
+      - VIKUNJA_REDIS_ENABLED=true
+      - VIKUNJA_REDIS_HOST=redis:6379
+      - VIKUNJA_REDIS_PASSWORD=$REDIS_PASSWORD
+      - VIKUNJA_MAILER_ENABLED=true
+      - VIKUNJA_MAILER_HOST=$SMTP_HOST
+      - VIKUNJA_MAILER_PORT=$SMTP_PORT
+      - VIKUNJA_MAILER_USERNAME=$SMTP_USERNAME
+      - VIKUNJA_MAILER_PASSWORD=$SMTP_PASSWORD
+      - VIKUNJA_MAILER_FROMEMAIL=vikunja@$DOMAINNAME
+      - VIKUNJA_MAILER_FORCESSL=true
+      - VIKUNJA_DEFAULTSETTINGS_EMAIL_REMINDERS_ENABLED=true
+      - VIKUNJA_DEFAULTSETTINGS_DISCOVERABLE_BY_NAME=true
+      - VIKUNJA_DEFAULTSETTINGS_OVERDUE_TASKS_REMINDERS_ENABLED=true
+      - VIKUNJA_DEFAULTSETTINGS_TIMEZONE=$TZ
+      - VIKUNJA_DEFAULTSETTINGS_WEEK_START=1
+    labels:
+      - "traefik.enable=true"
+      ## HTTP Routers
+      - "traefik.http.routers.vikunja-rtr.entrypoints=https"
+      - "traefik.http.routers.vikunja-rtr.rule=Host(`todo.$DOMAINNAME`)"
+      - "traefik.http.routers.vikunja-rtr.tls=true"
+      ## Middlewares
+      - "traefik.http.routers.vikunja-rtr.middlewares=chain-no-auth@file"
+      ## HTTP Services
+      - "traefik.http.routers.vikunja-rtr.service=vikunja-svc"
+      - "traefik.http.services.vikunja-svc.loadbalancer.server.port=3456"
 
 #  freshrss:
 #    container_name: freshrss
