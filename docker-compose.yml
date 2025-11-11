@@ -194,7 +194,6 @@ services:
       - WATCHTOWER_NOTIFICATION_URL=telegram://$TGRAM_BOT_TOKEN@telegram?channels=$TGRAM_CHAT_ID
       - WATCHTOWER_NOTIFICATIONS_LEVEL=info
       - DOCKER_HOST=tcp://socket-proxy:2375
-      - DOCKER_API_VERSION=1.40
 
   mariadb:
     container_name: mariadb
