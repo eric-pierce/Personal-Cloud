@@ -173,7 +173,7 @@ services:
 
   watchtower:
     container_name: watchtower
-    image: containrrr/watchtower:latest
+    image: nickfedor/watchtower:latest
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -286,25 +286,25 @@ services:
       - PGADMIN_DEFAULT_PASSWORD=$PGADMIN_DEFAULT_PASSWORD
       - PGADMIN_LISTEN_PORT=5050
 
-  pma:
-    container_name: phpmyadmin
-    image: phpmyadmin/phpmyadmin:latest
-    restart: unless-stopped
-    networks:
-      internal: null
-      vpn-subnet:
-        ipv4_address: 20.20.10.4
-    depends_on:
-      - mariadb
-    secrets:
-      - mysql_root_password
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - PMA_HOST=mariadb
-      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
-      - ServerName=$DOMAINNAME
+#  pma:
+#    container_name: phpmyadmin
+#    image: phpmyadmin/phpmyadmin:latest
+#    restart: unless-stopped
+#    networks:
+#      internal: null
+#      vpn-subnet:
+#        ipv4_address: 20.20.10.4
+#    depends_on:
+#      - mariadb
+#    secrets:
+#      - mysql_root_password
+#    environment:
+#      - TZ=$TZ
+#      - PUID=$PUID
+#      - PGID=$PGID
+#      - PMA_HOST=mariadb
+#      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
+#      - ServerName=$DOMAINNAME
 
   wallabag:
     container_name: wallabag
@@ -540,7 +540,7 @@ services:
       - SIGNUPS_ALLOWED=false # set to false to disable signups
       - SIGNUPS_VERIFY=true
       - SMTP_EXPLICIT_TLS=true
-      - ADMIN_TOKEN=$ADMIN_TOKEN
+      #- ADMIN_TOKEN=$ADMIN_TOKEN
       - SMTP_HOST=$SMTP_HOST
       - SMTP_FROM=$SMTP_FROM
       - SMTP_PORT=$SMTP_PORT
@@ -853,42 +853,42 @@ services:
       #POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Check-Success'''
       POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=$DOMAINNAME-Restic-Check-Failed'''
 
-  meshcentral:
-    container_name: meshcentral
-    image: typhonragewind/meshcentral:latest
-    restart: always
-    networks:
-      - traefik
-    depends_on:
-      - traefik
-    ports:
-      - 8086:443
-    volumes:
-      - $DOCKERDIR/meshcentral/data:/opt/meshcentral/meshcentral-data
-      - $DOCKERDIR/meshcentral/user_files:/opt/meshcentral/meshcentral-files
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - HOSTNAME=mesh.$DOMAINNAME
-      - REVERSE_PROXY=mesh.$DOMAINNAME
-      - REVERSE_PROXY_TLS_PORT=443
-      - IFRAME=false
-      - ALLOW_NEW_ACCOUNTS=false
-      - WEBRTC=true
-    labels:
-      - "traefik.enable=true"
-      ## HTTP Routers
-      - "traefik.http.routers.mesh-rtr.entrypoints=https"
-      - "traefik.http.routers.mesh-rtr.rule=Host(`mesh.$DOMAINNAME`)"
-      - "traefik.http.routers.mesh-rtr.tls=true"
-      ## Middlewares
-      - "traefik.http.routers.mesh-rtr.middlewares=chain-no-auth@file"
-      ## HTTP Services
-      - "traefik.http.routers.mesh-rtr.service=mesh-svc"
-      - "traefik.http.services.mesh-svc.loadbalancer.server.port=443"
+#  meshcentral:
+#    container_name: meshcentral
+#    image: typhonragewind/meshcentral:latest
+#    restart: always
+#    networks:
+#      - traefik
+#    depends_on:
+#      - traefik
+#    ports:
+#      - 8086:443
+#    volumes:
+#      - $DOCKERDIR/meshcentral/data:/opt/meshcentral/meshcentral-data
+#      - $DOCKERDIR/meshcentral/user_files:/opt/meshcentral/meshcentral-files
+#    security_opt:
+#      - no-new-privileges:true
+#    environment:
+#      - TZ=$TZ
+#      - PUID=$PUID
+#      - PGID=$PGID
+#      - HOSTNAME=mesh.$DOMAINNAME
+#      - REVERSE_PROXY=mesh.$DOMAINNAME
+#      - REVERSE_PROXY_TLS_PORT=443
+#      - IFRAME=false
+#      - ALLOW_NEW_ACCOUNTS=false
+#      - WEBRTC=true
+#    labels:
+#      - "traefik.enable=true"
+#      ## HTTP Routers
+#      - "traefik.http.routers.mesh-rtr.entrypoints=https"
+#      - "traefik.http.routers.mesh-rtr.rule=Host(`mesh.$DOMAINNAME`)"
+#      - "traefik.http.routers.mesh-rtr.tls=true"
+#      ## Middlewares
+#      - "traefik.http.routers.mesh-rtr.middlewares=chain-no-auth@file"
+#      ## HTTP Services
+#      - "traefik.http.routers.mesh-rtr.service=mesh-svc"
+#      - "traefik.http.services.mesh-svc.loadbalancer.server.port=443"
 
   tandoor_backend:
     container_name: tandoor_backend
