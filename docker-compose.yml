@@ -1,3 +1,17 @@
+########################### EXTENSION FIELDS
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-restic-env: &restic-env
+  TZ: $TZ
+  RESTIC_REPOSITORY: b2:$B2_BUCKET:/restic
+  RESTIC_PASSWORD_FILE: /run/secrets/restic_password
+  B2_ACCOUNT_ID: $B2_ACCOUNT_ID
+  B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
+
 ########################### NETWORKS
 networks:
   traefik:
@@ -5,60 +19,73 @@ networks:
     external: true
   default:
     driver: bridge
-  socket-proxy:
+  socket-proxy: # read-write Docker API (Watchtower, Portainer)
     name: socket-proxy
     external: true
+  socket-proxy-ro: # read-only Docker API (Traefik)
+    name: socket-proxy-ro
+    internal: true
   internal:
     external: false
-  vpn-subnet:
+  vpn-subnet: # must be recreated on 10.20.10.0/24 - see MIGRATION.md
     name: vpn-subnet
     external: true
 
 ########################### SECRETS
 secrets:
-  cloudflare_email:
-    file: $SECRETSDIR/cloudflare_email
-  cloudflare_api_key:
-    file: $SECRETSDIR/cloudflare_api_key
-  mysql_root_password:
-    file: $SECRETSDIR/mysql_root_password
+  cloudflare_dns_api_token:
+    file: $SECRETSDIR/cloudflare_dns_api_token
   postgres_root_password:
     file: $SECRETSDIR/postgres_root_password
-#  firesync_secret:
-#    file: $SECRETSDIR/firesync_secret
   postgres_nextcloud_password:
     file: $SECRETSDIR/postgres_nextcloud_password
+  postgres_ttrss_password:
+    file: $SECRETSDIR/postgres_ttrss_password
+  postgres_mealie_password:
+    file: $SECRETSDIR/postgres_mealie_password
+  pgadmin_default_password:
+    file: $SECRETSDIR/pgadmin_default_password
+  redis_conf:
+    file: $SECRETSDIR/redis.conf
   restic_password:
     file: $SECRETSDIR/restic_password
+  watchtower_notification_url:
+    file: $SECRETSDIR/watchtower_notification_url
 
 ########################### SERVICES
 services:
   traefik:
     container_name: traefik
-    image: traefik:v2.11
+    image: traefik:v3.7 # pinned to a minor: v3 minors change behaviour - read docs/migrate/v3 before bumping
     restart: unless-stopped
     command: # CLI arguments
       - --global.checkNewVersion=true
       - --global.sendAnonymousUsage=false
       - --entryPoints.http.address=:80
+      - --entryPoints.http.http.redirections.entryPoint.to=https
+      - --entryPoints.http.http.redirections.entryPoint.scheme=https
+      - --entryPoints.http.http.aliasHeadersStrategy=delete
       - --entryPoints.https.address=:443
+        # Drop headers like X_Auth_User / X.Auth.User that PHP backends would read as X-Auth-User (spoofing)
+      - --entryPoints.https.http.aliasHeadersStrategy=delete
         # Allow these IPs to set the X-Forwarded-* headers - Cloudflare IPs: https://www.cloudflare.com/ips/
       - --entrypoints.https.forwardedHeaders.trustedIPs=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22
-      - --entryPoints.traefik.address=:8080
       - --entrypoints.https.http.tls.certresolver=dns-cloudflare
-      - --api=false
+        # Wildcard cert for every router on :443 (previously carried by the dashboard router)
+      - --entrypoints.https.http.tls.domains[0].main=$DOMAINNAME
+      - --entrypoints.https.http.tls.domains[0].sans=*.$DOMAINNAME
+      - --api=false # No dashboard or API: this instance is internet-facing
       - --log=true
-      - --log.level=DEBUG # (Default: error) DEBUG, INFO, WARN, ERROR, FATAL, PANIC
+      - --log.level=WARN # (Default: error) DEBUG, INFO, WARN, ERROR, FATAL, PANIC
       - --accessLog=true
       - --accessLog.filePath=/traefik.log
       - --accessLog.bufferingSize=100 # Configuring a buffer of 100 lines
       - --accessLog.filters.statusCodes=400-499
       - --providers.docker=true
-      - --providers.docker.endpoint=tcp://socket-proxy:2375
+      - --providers.docker.endpoint=tcp://socket-proxy-ro:2375
       - --providers.docker.defaultrule=Host(`{{ index .Labels "com.docker.compose.service" }}.$DOMAINNAME`)
       - --providers.docker.exposedByDefault=false
       - --providers.docker.network=traefik
-      - --providers.docker.swarmMode=false
       - --providers.file.directory=/rules # Load dynamic configuration from one or more .toml or .yml files in a directory.
       - --providers.file.watch=true # Only works on top level files in the rules folder
 #      - --certificatesResolvers.dns-cloudflare.acme.caServer=https://acme-staging-v02.api.letsencrypt.org/directory # LetsEncrypt Staging Server - uncomment when testing
@@ -66,17 +93,16 @@ services:
       - --certificatesResolvers.dns-cloudflare.acme.storage=/acme.json
       - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.provider=cloudflare
       - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.resolvers=1.1.1.1:53,1.0.0.1:53
-      - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.delayBeforeCheck=5
+      - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.propagation.delayBeforeChecks=5s
     networks:
       - traefik
-      - socket-proxy
+      - socket-proxy-ro
     security_opt:
       - no-new-privileges:true
     secrets:
-      - cloudflare_email
-      - cloudflare_api_key
+      - cloudflare_dns_api_token
     depends_on:
-      - socket-proxy
+      - socket-proxy-ro
     ports:
       - target: 80
         published: 80
@@ -93,44 +119,41 @@ services:
       - $DOCKERDIR/shared:/shared
     environment:
       - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - CF_API_EMAIL_FILE=/run/secrets/cloudflare_email
-      - CF_API_KEY_FILE=/run/secrets/cloudflare_api_key
-    labels:
-      - "traefik.enable=true"
-      # HTTP-to-HTTPS Redirect
-      - "traefik.http.routers.http-catchall.entrypoints=http"
-      - "traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)"
-      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      # HTTP Routers
-      - "traefik.http.routers.traefik-rtr.entrypoints=https"
-      - "traefik.http.routers.traefik-rtr.rule=Host(`traefik.$DOMAINNAME`)"
-      - "traefik.http.routers.traefik-rtr.tls=true"
-      #- "traefik.http.routers.traefik-rtr.tls.certresolver=dns-cloudflare" # Comment out this line after first run of traefik to force the use of wildcard certs
-      - "traefik.http.routers.traefik-rtr.tls.domains[0].main=$DOMAINNAME"
-      - "traefik.http.routers.traefik-rtr.tls.domains[0].sans=*.$DOMAINNAME"
-      ## Services - API
-      - "traefik.http.routers.traefik-rtr.service=api@internal"
-      ## Middlewares
-      - "traefik.http.routers.traefik-rtr.middlewares=chain-basic-auth@file"
+      - CF_DNS_API_TOKEN_FILE=/run/secrets/cloudflare_dns_api_token # Scoped token: Zone:DNS:Edit only
+    logging: *default-logging
+    # No traefik.* labels: exposedByDefault=false keeps Traefik from routing to itself
 
-  socket-proxy:
-    container_name: socket-proxy
-    image: fluencelabs/docker-socket-proxy
-    restart: always
+  # Read-only Docker API for the internet-facing reverse proxy
+  socket-proxy-ro:
+    container_name: socket-proxy-ro
+    image: tecnativa/docker-socket-proxy:latest
+    restart: unless-stopped
     networks:
-      - socket-proxy
-    privileged: true
+      - socket-proxy-ro
+    security_opt:
+      - no-new-privileges:true
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
-    ports:
-      - "127.0.0.1:2375:2375"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
     environment:
       - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
+      - LOG_LEVEL=info # debug,info,notice,warning,err,crit,alert,emerg
+      ## EVENTS, PING, VERSION are granted by default; POST is denied by default
+      - CONTAINERS=1 # Traefik
+    logging: *default-logging
+
+  # Read-write Docker API - NOT exposed on the host; reachable only on the socket-proxy network
+  socket-proxy:
+    container_name: socket-proxy
+    image: tecnativa/docker-socket-proxy:latest
+    restart: unless-stopped
+    networks:
+      - socket-proxy
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    environment:
+      - TZ=$TZ
       - LOG_LEVEL=info # debug,info,notice,warning,err,crit,alert,emerg
       ## Variables match the URL prefix (i.e. AUTH blocks access to /auth/* parts of the API, etc.).
       # 0 to revoke access.
@@ -143,15 +166,14 @@ services:
       # Security critical
       - AUTH=0
       - SECRETS=0
-      - POST=1 # Watchtower
-      - DELETE=1 # Watchtower
-        # GET Optons
+      - POST=1 # Watchtower - allows all non-GET methods on the sections enabled below
+      - EXEC=0 # Restic no longer needs docker exec (see pg-backup); disables Portainer's container console
+        # GET Options
       - BUILD=0
       - COMMIT=0
       - CONFIGS=0
-      - CONTAINERS=1 # Traefik, portainer, etc.
+      - CONTAINERS=1 # Portainer, Watchtower
       - DISTRIBUTION=0
-      - EXEC=1 # Restic
       - IMAGES=1 # Portainer, Watchtower
       - INFO=1 # Portainer
       - NETWORKS=1 # Portainer, Watchtower
@@ -161,15 +183,9 @@ services:
       - SESSION=0
       - SWARM=0
       - SYSTEM=0
-      - TASKS=1 # Portaienr
+      - TASKS=1 # Portainer
       - VOLUMES=1 # Portainer
-      # POST Options
-      - CONTAINERS_CREATE=1 # WatchTower
-      - CONTAINERS_START=1 # WatchTower
-      - CONTAINERS_UPDATE=1 # WatchTower
-      # DELETE Options
-      - CONTAINERS_DELETE=1 # WatchTower
-      - IMAGES_DELETE=1 # WatchTower
+    logging: *default-logging
 
   watchtower:
     container_name: watchtower
@@ -179,48 +195,24 @@ services:
       - no-new-privileges:true
     networks:
       - socket-proxy
+      - default # internet access for registry checks + Telegram (socket-proxy may be --internal)
     depends_on:
       - socket-proxy
+    secrets:
+      - watchtower_notification_url
     environment:
       - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
       - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_REMOVE_VOLUMES=true
+      - WATCHTOWER_REMOVE_VOLUMES=false # true deletes anonymous volumes when containers are recreated
       - WATCHTOWER_INCLUDE_STOPPED=true
       - WATCHTOWER_NO_STARTUP_MESSAGE=false
       - WATCHTOWER_SCHEDULE=0 0 4 * * * # Everyday at 04:00
       - WATCHTOWER_NOTIFICATIONS=shoutrrr
-      - WATCHTOWER_NOTIFICATION_URL=telegram://$TGRAM_BOT_TOKEN@telegram?channels=$TGRAM_CHAT_ID
+      - WATCHTOWER_NOTIFICATION_URL=/run/secrets/watchtower_notification_url # Watchtower reads the URL from this file
       - WATCHTOWER_NOTIFICATIONS_LEVEL=info
       - DOCKER_HOST=tcp://socket-proxy:2375
-
-  mariadb:
-    container_name: mariadb
-    image: mariadb:latest
-    restart: always
-    networks:
-      - internal
-    security_opt:
-      - no-new-privileges:true
-    ports:
-      - "127.0.0.1:3306:3306"
-    secrets:
-      - mysql_root_password
-    command: >
-      --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
-      --innodb-file-format=Barracuda
-      --innodb-file-per-table=1
-    volumes:
-      - $DOCKERDIR/mariadb/data:/var/lib/mysql
-      - $DOCKERDIR/mariadb/backups:/dbbackups
-      - /etc/localtime:/etc/localtime:ro
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
+      #- DOCKER_API_VERSION=1.40
+    logging: *default-logging
 
   postgres:
     container_name: postgres
@@ -230,26 +222,58 @@ services:
       - internal
     security_opt:
       - no-new-privileges:true
-    ports:
-      - "127.0.0.1:5432:5432"
     secrets:
       - postgres_root_password
     volumes:
       - $DOCKERDIR/postgres:/var/lib/postgresql/data
     environment:
       - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
       - POSTGRES_USER=$POSTGRES_USER
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_root_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *default-logging
+
+  # Logical dumps of each database; picked up by restic from $DOCKERDIR/pgbackups
+  pg-backup:
+    container_name: pg-backup
+    image: prodrigestivill/postgres-backup-local:17-alpine # keep major in step with postgres
+    user: postgres:postgres # uid/gid 70 on alpine - chown the backup dir to match
+    restart: unless-stopped
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    secrets:
+      - postgres_root_password
+    volumes:
+      - $DOCKERDIR/pgbackups:/backups
+    environment:
+      - TZ=$TZ
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=nextcloud,wallabag,ttrss,mealie # every database to dump - check with \l
+      - POSTGRES_USER=$POSTGRES_USER
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_root_password
+      - SCHEDULE=@daily # midnight, ahead of the 02:00 restic backup
+      - BACKUP_KEEP_DAYS=7
+      - BACKUP_KEEP_WEEKS=4
+      - BACKUP_KEEP_MONTHS=6
+    logging: *default-logging
 
   portainer:
     container_name: portainer
-    image: portainer/portainer-ce:latest
+    image: portainer/portainer-ce:lts
     restart: unless-stopped
     networks:
       vpn-subnet:
-        ipv4_address: 20.20.10.2
+        ipv4_address: 10.20.10.2
       socket-proxy: null
     security_opt:
       - no-new-privileges:true
@@ -259,9 +283,8 @@ services:
       - $DOCKERDIR/portainer:/data
     environment:
       - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
       - DOCKER_HOST=tcp://socket-proxy:2375
+    logging: *default-logging
 
   pgadmin:
     container_name: pgadmin
@@ -270,55 +293,40 @@ services:
     networks:
       internal: null
       vpn-subnet:
-        ipv4_address: 20.20.10.3
+        ipv4_address: 10.20.10.3
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     security_opt:
       - no-new-privileges:true
+    secrets:
+      - pgadmin_default_password
     volumes:
       - $DOCKERDIR/pgadmin:/var/lib/pgadmin
     environment:
       - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
       - PGADMIN_DEFAULT_EMAIL=$PERSONAL_EMAIL
-      - PGADMIN_DEFAULT_PASSWORD=$PGADMIN_DEFAULT_PASSWORD
+      - PGADMIN_DEFAULT_PASSWORD_FILE=/run/secrets/pgadmin_default_password
       - PGADMIN_LISTEN_PORT=5050
-
-#  pma:
-#    container_name: phpmyadmin
-#    image: phpmyadmin/phpmyadmin:latest
-#    restart: unless-stopped
-#    networks:
-#      internal: null
-#      vpn-subnet:
-#        ipv4_address: 20.20.10.4
-#    depends_on:
-#      - mariadb
-#    secrets:
-#      - mysql_root_password
-#    environment:
-#      - TZ=$TZ
-#      - PUID=$PUID
-#      - PGID=$PGID
-#      - PMA_HOST=mariadb
-#      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
-#      - ServerName=$DOMAINNAME
+    logging: *default-logging
 
   wallabag:
     container_name: wallabag
-    image: wallabag/wallabag:latest
-    restart: always
+    image: wallabag/wallabag:2.6.14 # pinned; bump deliberately after reading release notes
+    restart: unless-stopped
     networks:
       - traefik
       - internal
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - $DOCKERDIR/wallabag/images:/var/www/wallabag/web/assets/images
       - $DOCKERDIR/wallabag/data:/var/www/wallabag/data
-    ports:
-      - 8006:80
     environment:
       - TZ=$TZ
       - PUID=$PUID
@@ -328,13 +336,14 @@ services:
       - SYMFONY__ENV__DATABASE_PORT=5432
       - SYMFONY__ENV__DATABASE_NAME=wallabag
       - SYMFONY__ENV__DATABASE_USER=wallabag
-      - SYMFONY__ENV__DATABASE_PASSWORD=$POSTGRES_WALLA_PASSWORD
+      - SYMFONY__ENV__DATABASE_PASSWORD=$POSTGRES_WALLA_PASSWORD # image has no *_FILE support
       - SYMFONY__ENV__SECRET=$WALLA_SECRET
       - SYMFONY__ENV__DOMAIN_NAME=https://walla.$DOMAINNAME
       - SYMFONY__ENV__REDIS_HOST=redis
       - SYMFONY__ENV__REDIS_PASSWORD=$REDIS_PASSWORD
       - SYMFONY__ENV__FOSUSER_REGISTRATION=false
       - POPULATE_DATABASE=False
+    logging: *default-logging
     labels:
       - traefik.enable=true
       ## HTTP Routers
@@ -349,35 +358,36 @@ services:
 
   nextcloud:
     container_name: nextcloud
-    image: nextcloud:latest
-    restart: always
+    image: nextcloud:35-apache # pin to the major you are on; upgrade one major at a time
+    restart: unless-stopped
     networks:
       - traefik
       - internal
     security_opt:
       - no-new-privileges:true
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - $DOCKERDIR/nextcloud:/var/www/html
-      - $DOCKERDIR/nextcloud/changes.ini:/usr/local/etc/php/conf.d/changes.ini
+      - $DOCKERDIR/nextcloud-php/changes.ini:/usr/local/etc/php/conf.d/changes.ini:ro # kept outside the web root
     secrets:
       - postgres_nextcloud_password
-    ports:
-      - 8008:80
     environment:
       - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
       - POSTGRES_DB=nextcloud
       - POSTGRES_USER=nextcloud
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_nextcloud_password
       - POSTGRES_HOST=postgres
       - NEXTCLOUD_TRUSTED_DOMAINS=nextcloud.$DOMAINNAME
-      - TRUSTED_PROXIES=172.18.0.0/16
+      - TRUSTED_PROXIES=${TRAEFIK_SUBNET:-10.10.20.0/24} # must match `docker network inspect traefik`
+      - OVERWRITEPROTOCOL=https
+      - OVERWRITECLIURL=https://nextcloud.$DOMAINNAME
       - REDIS_HOST=redis
       - REDIS_HOST_PASSWORD=$REDIS_PASSWORD
+    logging: *default-logging
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
@@ -385,33 +395,34 @@ services:
       - "traefik.http.routers.nextcloud-rtr.rule=Host(`nextcloud.$DOMAINNAME`)"
       - "traefik.http.routers.nextcloud-rtr.tls=true"
       ## Middlewares
-      - "traefik.http.routers.nextcloud-rtr.middlewares=chain-no-auth@file"
+      - "traefik.http.routers.nextcloud-rtr.middlewares=nextcloud-dav,chain-no-auth@file"
+      - "traefik.http.middlewares.nextcloud-dav.redirectregex.permanent=true"
+      - "traefik.http.middlewares.nextcloud-dav.redirectregex.regex=^https://(.*)/.well-known/(?:card|cal)dav"
+      - "traefik.http.middlewares.nextcloud-dav.redirectregex.replacement=https://$${1}/remote.php/dav"
       ## HTTP Services
       - "traefik.http.routers.nextcloud-rtr.service=nextcloud-svc"
       - "traefik.http.services.nextcloud-svc.loadbalancer.server.port=80"
-      - "traefik.http.middlewares.nextcloud-dav.replacepathregex.regex=^/.well-known/ca(l|rd)dav"
-      - "traefik.http.middlewares.nextcloud-dav.replacepathregex.replacement=/remote.php/dav/"
+      ## Nextcloud cannot skip majors - update manually
+      - "com.centurylinklabs.watchtower.monitor-only=true"
 
   nextcloud-cron:
     container_name: nextcloud-cron
-    image: nextcloud:latest
+    image: nextcloud:35-apache # must match the nextcloud service
     entrypoint: /cron.sh
-    restart: always
+    restart: unless-stopped
     networks:
       - internal
     security_opt:
       - no-new-privileges:true
     depends_on:
       - nextcloud
-      - redis
     volumes:
       - $DOCKERDIR/nextcloud:/var/www/html
     environment:
       - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - REDIS_HOST=redis
-      - REDIS_HOST_PASSWORD=$REDIS_PASSWORD
+    logging: *default-logging
+    labels:
+      - "com.centurylinklabs.watchtower.monitor-only=true"
 
   wireguard:
     container_name: wireguard
@@ -419,39 +430,44 @@ services:
     restart: unless-stopped
     networks:
       vpn-subnet:
-        ipv4_address: 20.20.10.5
+        ipv4_address: 10.20.10.5
     volumes:
       - $DOCKERDIR/wireguard:/config
-      - /lib/modules:/lib/modules
     ports:
       - 51820:51820/udp
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
     cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
+      - NET_ADMIN # SYS_MODULE + /lib/modules not needed on kernels >= 5.6 (WireGuard built in)
     security_opt:
       - no-new-privileges:true
     environment:
       - TZ=$TZ
       - PUID=$PUID
       - PGID=$PGID
-      - SERVERURL=wireguard.$DOMAINNAME
+      - SERVERURL=wireguard.$DOMAINNAME # DNS-only (grey cloud) in Cloudflare - UDP can't be proxied
       - SERVERPORT=51820
       - PEERS=2
       - PEERDNS=auto
       - INTERNAL_SUBNET=10.13.14.0
+    logging: *default-logging
 
   app:
     container_name: ttrss-app
     image: supahgreg/tt-rss:latest
-    restart: always
+    restart: unless-stopped
     networks:
       - internal
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     security_opt:
       - no-new-privileges:true
+    dns:
+      - 1.1.1.1
+      - 9.9.9.9
+    secrets:
+      - postgres_ttrss_password
     volumes:
       - $DOCKERDIR/ttrss:/var/www/html
     environment:
@@ -459,20 +475,26 @@ services:
       - TTRSS_DB_HOST=postgres
       - TTRSS_DB_NAME=ttrss
       - TTRSS_DB_USER=ttrss
-      - TTRSS_DB_PASS=$POSTGRES_TTRSS_PASSWORD
-      - TTRSS_SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss
-#      - TTRSS_PLUGINS=freshapi
+      - TTRSS_DB_PASS__FILE=/run/secrets/postgres_ttrss_password # note: double underscore
+      - TTRSS_SELF_URL_PATH=https://feed.$DOMAINNAME/
+      - APP_BASE= # read by the nginx_xaccel plugin; must match the ttrss (nginx) service
+    logging: *default-logging
 
   ttrss-updater:
     container_name: ttrss-updater
     image: supahgreg/tt-rss:latest
-    restart: always
+    restart: unless-stopped
     networks:
       - internal
     depends_on:
       - app
     security_opt:
       - no-new-privileges:true
+    dns:
+      - 1.1.1.1
+      - 9.9.9.9
+    secrets:
+      - postgres_ttrss_password
     volumes:
       - $DOCKERDIR/ttrss:/var/www/html
     environment:
@@ -480,9 +502,10 @@ services:
       - TTRSS_DB_HOST=postgres
       - TTRSS_DB_NAME=ttrss
       - TTRSS_DB_USER=ttrss
-      - TTRSS_DB_PASS=$POSTGRES_TTRSS_PASSWORD
-      - TTRSS_SELF_URL_PATH=https://feed.$DOMAINNAME/tt-rss
+      - TTRSS_DB_PASS__FILE=/run/secrets/postgres_ttrss_password # note: double underscore
+      - TTRSS_SELF_URL_PATH=https://feed.$DOMAINNAME/
     command: /opt/tt-rss/updater.sh
+    logging: *default-logging
 
   ttrss:
     container_name: ttrss
@@ -495,14 +518,15 @@ services:
       - app
     security_opt:
       - no-new-privileges:true
-    ports:
-      - 8009:80
     volumes:
       - $DOCKERDIR/ttrss:/var/www/html:ro
 #      - $DOCKERDIR/ttrss-nginx.conf.template:/etc/nginx/templates/nginx.conf.template
     environment:
       - TZ=$TZ
-      - HTTP_PORT=8009
+      # Serve tt-rss at the site root instead of /tt-rss/
+      - APP_WEB_ROOT=/var/www/html/tt-rss
+      - APP_BASE=
+    logging: *default-logging
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
@@ -510,549 +534,197 @@ services:
       - "traefik.http.routers.ttrss-rtr.rule=Host(`feed.$DOMAINNAME`)"
       - "traefik.http.routers.ttrss-rtr.tls=true"
       ## Middlewares
-      - "traefik.http.routers.ttrss-rtr.middlewares=chain-no-auth@file"
+      - "traefik.http.routers.ttrss-rtr.middlewares=ttrss-legacy-path,chain-no-auth@file"
+      - "traefik.http.middlewares.ttrss-legacy-path.redirectregex.permanent=true"
+      - "traefik.http.middlewares.ttrss-legacy-path.redirectregex.regex=^https://([^/]+)/tt-rss(?:/(.*))?$$"
+      - "traefik.http.middlewares.ttrss-legacy-path.redirectregex.replacement=https://$${1}/$${2}"
       ## HTTP Services
       - "traefik.http.routers.ttrss-rtr.service=ttrss-svc"
       - "traefik.http.services.ttrss-svc.loadbalancer.server.port=80"
 
-  vaultwarden:
-    container_name: vaultwarden
-    image: vaultwarden/server:latest
-    restart: always
-    volumes:
-      - $DOCKERDIR/vaultwarden:/data
-    depends_on:
-      - postgres
-    security_opt:
-      - no-new-privileges:true
-    networks:
-      - traefik
-      - internal
-    ports:
-      - 8003:80
-      - 3012:3012
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - WEBSOCKET_ENABLED=true # Required to use websockets
-      - SIGNUPS_ALLOWED=false # set to false to disable signups
-      - SIGNUPS_VERIFY=true
-      - SMTP_EXPLICIT_TLS=true
-      #- ADMIN_TOKEN=$ADMIN_TOKEN
-      - SMTP_HOST=$SMTP_HOST
-      - SMTP_FROM=$SMTP_FROM
-      - SMTP_PORT=$SMTP_PORT
-      - SMTP_SSL=true
-      - SMTP_USERNAME=$SMTP_USERNAME
-      - SMTP_PASSWORD=$SMTP_PASSWORD
-      - DOMAIN=https://vault.$DOMAINNAME
-      - DATABASE_URL=postgres://vaultwarden:$POSTGRES_VAULTWARDEN_PASSWORD@postgres:5432/vaultwarden
-    labels:
-      - "traefik.enable=true"
-      ## HTTP Routers
-      - "traefik.http.routers.vaultwarden-rtr.entrypoints=https"
-      - "traefik.http.routers.vaultwarden-rtr.rule=Host(`vault.$DOMAINNAME`)"
-      - "traefik.http.routers.vaultwarden-rtr.tls=true"
-      ## Middlewares
-      - "traefik.http.routers.vaultwarden-rtr.middlewares=chain-no-auth@file"
-      ## HTTP Services
-      - "traefik.http.routers.vaultwarden-rtr.service=vaultwarden-svc"
-      - "traefik.http.services.vaultwarden-svc.loadbalancer.server.port=80"
-      ## WS HTTP Routers
-      - "traefik.http.routers.vaultwarden-ws-rtr.entrypoints=https"
-      - "traefik.http.routers.vaultwarden-ws-rtr.rule=Host(`vault.$DOMAINNAME`) && Path(`/notifications/hub`)"
-      - "traefik.http.routers.vaultwarden-ws-rtr.tls=true"
-      ## WS Middlewares
-      - "traefik.http.routers.vaultwarden-ws-rtr.middlewares=chain-no-auth@file"
-      ## WS HTTP Services
-      - "traefik.http.routers.vaultwarden-ws-rtr.service=vaultwarden-ws-svc"
-      - "traefik.http.services.vaultwarden-ws-svc.loadbalancer.server.port=3012"
-
-#  localstack:
-#    image: localstack/localstack:latest
-#    container_name: localstack
-#    ports:
-#      - "127.0.0.1:4566:4566"
-#    restart: unless-stopped
-#    environment:
-#      - SERVICES=sns,sqs
-#      - HOSTNAME_EXTERNAL=localstack
-#      - LS_LOG=warn
+#  vaultwarden:
+#    container_name: vaultwarden
+#    image: vaultwarden/server:latest
+#    restart: always
 #    volumes:
-#      - $DOCKERDIR/localstack/localstack_bootstrap.sh:/etc/localstack/init/ready.d/localstack_bootstrap.sh
-#    networks:
-#      - internal
-#
-#  snserver:
-#    container_name: snserver
-#    image: standardnotes/server:latest
-#    restart: unless-stopped
+#      - $DOCKERDIR/vaultwarden:/data
+#    depends_on:
+#      - postgres
+#    security_opt:
+#      - no-new-privileges:true
 #    networks:
 #      - traefik
 #      - internal
-#    depends_on:
-#      - mariadb
-#      - redis
-#      - snext
-#      - localstack
 #    ports:
-#      - 8007:3000
-#      - 8012:3104
-#    volumes:
-#      - $DOCKERDIR/snserver/logs:/var/lib/server/logs
-#      - $DOCKERDIR/snserver/uploads:/opt/bundled/files/packages/files/dist/uploads
-#    security_opt:
-#      - no-new-privileges:true
+#      - 8003:80
+#      - 3012:3012
 #    environment:
 #      - TZ=$TZ
 #      - PUID=$PUID
 #      - PGID=$PGID
-#      - DB_PORT=3306
-#      - DB_HOST=mariadb
-#      - DB_DATABASE=standardnotes
-#      - DB_USERNAME=standardnotes
-#      - DB_PASSWORD=$MYSQL_STANDARDNOTES_PASSWORD
-#      - DB_DEBUG_LEVEL=all
-#      - REDIS_URL=redis://:$REDIS_PASSWORD@redis:6379
-#      - REDIS_PORT=6379
-#      - REDIS_HOST=redis
-#      - REDIS_HOST_PASSWORD=$REDIS_PASSWORD
-#      - EXPOSED_PORT=8007
-#      - EXPOSED_FILES_SERVER_PORT=8012
-#      - DISABLE_USER_REGISTRATION=false
-#      - NEW_RELIC_ENABLED=false
-#      - AUTH_JWT_SECRET=$AUTH_JWT_SECRET
-#      - AUTH_SERVER_ENCRYPTION_SERVER_KEY=$AUTH_SERVER_ENCRYPTION_SERVER_KEY
-#      - VALET_TOKEN_SECRET=$VALET_TOKEN_SECRET
+#      - WEBSOCKET_ENABLED=true # Required to use websockets
+#      - SIGNUPS_ALLOWED=false # set to false to disable signups
+#      - SIGNUPS_VERIFY=true
+#      - SMTP_EXPLICIT_TLS=true
+#      #- ADMIN_TOKEN=$ADMIN_TOKEN
+#      - SMTP_HOST=$SMTP_HOST
+#      - SMTP_FROM=$SMTP_FROM
+#      - SMTP_PORT=$SMTP_PORT
+#      - SMTP_SSL=true
+#      - SMTP_USERNAME=$SMTP_USERNAME
+#      - SMTP_PASSWORD=$SMTP_PASSWORD
+#      - DOMAIN=https://vault.$DOMAINNAME
+#      - DATABASE_URL=postgres://vaultwarden:$POSTGRES_VAULTWARDEN_PASSWORD@postgres:5432/vaultwarden
 #    labels:
 #      - "traefik.enable=true"
 #      ## HTTP Routers
-#      - "traefik.http.routers.notesync-rtr.entrypoints=https"
-#      - "traefik.http.routers.notesync-rtr.rule=Host(`notesync.$DOMAINNAME`)"
-#      - "traefik.http.routers.notesync-rtr.tls=true"
+#      - "traefik.http.routers.vaultwarden-rtr.entrypoints=https"
+#      - "traefik.http.routers.vaultwarden-rtr.rule=Host(`vault.$DOMAINNAME`)"
+#      - "traefik.http.routers.vaultwarden-rtr.tls=true"
 #      ## Middlewares
-#      - "traefik.http.routers.notesync-rtr.middlewares=chain-no-auth@file"
-#      - "traefik.http.routers.notesync-rtr.middlewares=middlewares-standardnotes@file"
+#      - "traefik.http.routers.vaultwarden-rtr.middlewares=chain-no-auth@file"
 #      ## HTTP Services
-#      - "traefik.http.routers.notesync-rtr.service=notesync-svc"
-#      - "traefik.http.services.notesync-svc.loadbalancer.server.port=3000"
-#
-#  snui:
-#    container_name: snui
-#    image: ghcr.io/jackyzy823/standardnotes-web:latest
-#    restart: unless-stopped
-#    networks:
-#      - traefik
-#    depends_on:
-#      - snserver
-#    ports:
-#      - 8010:80
-#    security_opt:
-#      - no-new-privileges:true
-#    environment:
-#      - TZ=$TZ
-#      - PUID=$PUID
-#      - PGID=$PGID
-#      - PORT=80
-#      - APP_HOST=https://notes.$DOMAINNAME
-#      - DEFAULT_SYNC_SERVER=https://notesync.$DOMAINNAME
-#      - DEFAULT_FILES_HOST=https://notesync.$DOMAINNAME
-#      - ENABLE_UNFINISHED_FEATURES=false
-#      - PURCHASE_URL=https://notes.$DOMAINNAME
-#      - WEBSOCKET_URL=https://notes.$DOMAINNAME
-#      - PLANS_URL=https://notes.$DOMAINNAME
-#      - DASHBOARD_URL=https://notes.$DOMAINNAME
-#      - SECRET_KEY_BASE=$STANDARD_NOTES_SECRET
-#    labels:
-#      - "traefik.enable=true"
-#      ## HTTP Routers
-#      - "traefik.http.routers.notes-rtr.entrypoints=https"
-#      - "traefik.http.routers.notes-rtr.rule=Host(`notes.$DOMAINNAME`)"
-#      - "traefik.http.routers.notes-rtr.tls=true"
-#      ## Middlewares
-#      - "traefik.http.routers.notes-rtr.middlewares=chain-no-auth@file"
-#      ## HTTP Services
-#      - "traefik.http.routers.notes-rtr.service=notes-svc"
-#      - "traefik.http.services.notes-svc.loadbalancer.server.port=80"
-#
-#  snext:
-#    container_name: snext
-#    image: sentriz/standardnotes-extensions:latest
-#    restart: unless-stopped
-#    command: start-local
-#    networks:
-#      - traefik
-#    ports:
-#      - 8011:80
-#    volumes:
-#      - $DOCKERDIR/snext:/repos
-#    security_opt:
-#      - no-new-privileges:true
-#    environment:
-#      - TZ=$TZ
-#      - PUID=$PUID
-#      - PGID=$PGID
-#      - SN_EXTS_LISTEN_ADDR=:80
-#      - SN_EXTS_REPOS_DIR=/repos
-#      - SN_EXTS_DEFINITIONS_DIR=/definitions
-#      - SN_EXTS_BASE_URL=https://snext.$DOMAINNAME
-#      - SN_EXTS_UPDATE_INTERVAL_MINS=4320
-#    labels:
-#      - "traefik.enable=true"
-#      ## HTTP Routers
-#      - "traefik.http.routers.snext-rtr.entrypoints=https"
-#      - "traefik.http.routers.snext-rtr.rule=Host(`snext.$DOMAINNAME`)"
-#      - "traefik.http.routers.snext-rtr.tls=true"
-#      ## Middlewares
-#      - "traefik.http.routers.snext-rtr.middlewares=chain-no-auth@file"
-#      - "traefik.http.routers.snext-rtr.middlewares=middlewares-standardnotes@file"
-#      ## HTTP Services
-#      - "traefik.http.routers.snext-rtr.service=snext-svc"
-#      - "traefik.http.services.snext-svc.loadbalancer.server.port=80"
+#      - "traefik.http.routers.vaultwarden-rtr.service=vaultwarden-svc"
+#      - "traefik.http.services.vaultwarden-svc.loadbalancer.server.port=80"
+#      ## WS HTTP Routers
+#      - "traefik.http.routers.vaultwarden-ws-rtr.entrypoints=https"
+#      - "traefik.http.routers.vaultwarden-ws-rtr.rule=Host(`vault.$DOMAINNAME`) && Path(`/notifications/hub`)"
+#      - "traefik.http.routers.vaultwarden-ws-rtr.tls=true"
+#      ## WS Middlewares
+#      - "traefik.http.routers.vaultwarden-ws-rtr.middlewares=chain-no-auth@file"
+#      ## WS HTTP Services
+#      - "traefik.http.routers.vaultwarden-ws-rtr.service=vaultwarden-ws-svc"
+#      - "traefik.http.services.vaultwarden-ws-svc.loadbalancer.server.port=3012"
 
   redis:
     container_name: redis
-    image: redis:latest
-    command: redis-server --requirepass $REDIS_PASSWORD
-    restart: always
+    image: redis:8-alpine
+    command: ["redis-server", "/run/secrets/redis_conf"] # password lives in redis.conf, not on the command line
+    restart: unless-stopped
     networks:
       - internal
     security_opt:
       - no-new-privileges:true
-    ports:
-      - "127.0.0.1:6379:6379"
+    secrets:
+      - redis_conf
     volumes:
       - $DOCKERDIR/redis:/data
     environment:
       - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -qE 'PONG|NOAUTH'"] # NOAUTH still proves the server is up
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
 
-#  rediscommander:
-#    container_name: rediscommander
-#    image: rediscommander/redis-commander:latest
-#    restart: always
-#    networks:
-#      internal: null
-#      vpn-subnet:
-#        ipv4_address: 20.20.10.6
-#    depends_on:
-#      - redis
-#    security_opt:
-#      - no-new-privileges:true
-#    environment:
-#      - TZ=$TZ
-#      - PUID=$PUID
-#      - PGID=$PGID
-#      - REDIS_HOST=redis
-#      - REDIS_PASSWORD=$REDIS_PASSWORD
-
+  # Backs up all of $DOCKERDIR (incl. pg-backup dumps). No Docker socket access needed.
   restic:
     container_name: restic
     image: mazzolino/restic:latest
     restart: unless-stopped
     networks:
-      - socket-proxy
-      - internal
-    depends_on:
-      - socket-proxy
-      - mariadb
-      - postgres
+      - default
     security_opt:
       - no-new-privileges:true
     secrets:
       - restic_password
     volumes:
       - $DOCKERDIR:/source/data:ro
-      - $DOCKERDIR/restic:/source/dbbackups/
     environment:
-      TZ: $TZ
-      PUID: $PUID
-      PGID: $PGID
+      <<: *restic-env
       RUN_ON_STARTUP: "true"
       BACKUP_CRON: "0 0 2 * * *"
-      RESTIC_REPOSITORY: b2:$B2_BUCKET:/restic
-      RESTIC_PASSWORD_FILE: /run/secrets/restic_password
       RESTIC_BACKUP_SOURCES: /source
+      # Live Postgres files aren't crash-consistent; the pg-backup dumps are what we restore from
       RESTIC_BACKUP_ARGS: >-
         --verbose
+        --exclude /source/data/postgres
       RESTIC_FORGET_ARGS: >-
         --keep-last 10
         --keep-daily 7
         --keep-weekly 5
         --keep-monthly 12
-      B2_ACCOUNT_ID: $B2_ACCOUNT_ID
-      B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
-      DOCKER_HOST: tcp://socket-proxy:2375
       #POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Backup-Success'''
       POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=$DOMAINNAME-Restic-Backup-Failed'''
-      PRE_COMMANDS: |-
-        docker exec postgres pg_dumpall -U $POSTGRES_USER > /source/dbbackups/postgres_dump.sql
+    logging: *default-logging
 
   restic-prune:
     container_name: restic-prune
     image: mazzolino/restic:latest
     restart: unless-stopped
     networks:
-      - internal
-    depends_on:
-      - restic
-      - mariadb
-      - postgres
+      - default
     security_opt:
       - no-new-privileges:true
     secrets:
       - restic_password
-    volumes:
-      - $DOCKERDIR:/source/data:ro
-      - $DOCKERDIR/restic:/source/dbbackups/
     environment:
-      TZ: $TZ
-      PUID: $PUID
-      PGID: $PGID
+      <<: *restic-env
       RUN_ON_STARTUP: "false"
       PRUNE_CRON: "0 0 7 * * *"
-      RESTIC_REPOSITORY: b2:$B2_BUCKET:/restic
-      RESTIC_PASSWORD_FILE: /run/secrets/restic_password
-      B2_ACCOUNT_ID: $B2_ACCOUNT_ID
-      B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
       #POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Prune-Success'''
       POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=$DOMAINNAME-Restic-Prune-Failed'''
+    logging: *default-logging
 
   restic-check:
     container_name: restic-check
     image: mazzolino/restic:latest
     restart: unless-stopped
     networks:
-      - internal
-    depends_on:
-      - restic
-      - mariadb
-      - postgres
+      - default
     security_opt:
       - no-new-privileges:true
     secrets:
       - restic_password
-    volumes:
-      - $DOCKERDIR:/source/data:ro
-      - $DOCKERDIR/restic:/source/dbbackups/
     environment:
-      TZ: $TZ
-      PUID: $PUID
-      PGID: $PGID
+      <<: *restic-env
       RUN_ON_STARTUP: "false"
       CHECK_CRON: "0 15 10 * * *"
       RESTIC_CHECK_ARGS: >-
         --read-data-subset=10%
-      RESTIC_REPOSITORY: b2:$B2_BUCKET:/restic
-      RESTIC_PASSWORD_FILE: /run/secrets/restic_password
-      B2_ACCOUNT_ID: $B2_ACCOUNT_ID
-      B2_ACCOUNT_KEY: $B2_ACCOUNT_KEY
       #POST_COMMANDS_SUCCESS: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=Restic-Check-Success'''
       POST_COMMANDS_FAILURE: 'curl -i -X GET ''https://api.telegram.org/bot$RESTIC_TGRAM_TOKEN/sendMessage?chat_id=$RESTIC_TGRAM_CHAT_ID&text=$DOMAINNAME-Restic-Check-Failed'''
+    logging: *default-logging
 
-#  meshcentral:
-#    container_name: meshcentral
-#    image: typhonragewind/meshcentral:latest
-#    restart: always
-#    networks:
-#      - traefik
-#    depends_on:
-#      - traefik
-#    ports:
-#      - 8086:443
-#    volumes:
-#      - $DOCKERDIR/meshcentral/data:/opt/meshcentral/meshcentral-data
-#      - $DOCKERDIR/meshcentral/user_files:/opt/meshcentral/meshcentral-files
-#    security_opt:
-#      - no-new-privileges:true
-#    environment:
-#      - TZ=$TZ
-#      - PUID=$PUID
-#      - PGID=$PGID
-#      - HOSTNAME=mesh.$DOMAINNAME
-#      - REVERSE_PROXY=mesh.$DOMAINNAME
-#      - REVERSE_PROXY_TLS_PORT=443
-#      - IFRAME=false
-#      - ALLOW_NEW_ACCOUNTS=false
-#      - WEBRTC=true
-#    labels:
-#      - "traefik.enable=true"
-#      ## HTTP Routers
-#      - "traefik.http.routers.mesh-rtr.entrypoints=https"
-#      - "traefik.http.routers.mesh-rtr.rule=Host(`mesh.$DOMAINNAME`)"
-#      - "traefik.http.routers.mesh-rtr.tls=true"
-#      ## Middlewares
-#      - "traefik.http.routers.mesh-rtr.middlewares=chain-no-auth@file"
-#      ## HTTP Services
-#      - "traefik.http.routers.mesh-rtr.service=mesh-svc"
-#      - "traefik.http.services.mesh-svc.loadbalancer.server.port=443"
-
-  tandoor_backend:
-    container_name: tandoor_backend
-    image: vabene1111/recipes:latest
-    restart: always
+  mealie:
+    container_name: mealie
+    image: hkotel/mealie:latest # actively maintained (v3.x); no floating major tag published
+    restart: unless-stopped
     networks:
+      - traefik
       - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - $DOCKERDIR/mealie/mealie-data:/app/data
     security_opt:
       - no-new-privileges:true
-    depends_on:
-      - postgres
-    volumes:
-      - $DOCKERDIR/tandoor/staticfiles:/opt/recipes/staticfiles
-      - $DOCKERDIR/tandoor/nginx_config:/opt/recipes/nginx/conf.d
-      - $DOCKERDIR/tandoor/mediafiles:/opt/recipes/mediafiles
+    secrets:
+      - postgres_mealie_password
     environment:
       - TZ=$TZ
       - PUID=$PUID
       - PGID=$PGID
-      - DEBUG=0
-      - ALLOWED_HOSTS=tandoor.$DOMAINNAME
-      - TIMEZONE=$TZ
-      - SECRET_KEY=$TANDOOR_SECRET_KEY
-      - DB_ENGINE=django.db.backends.postgresql
-      - POSTGRES_HOST=postgres
+      - ALLOW_SIGNUP=false
+      - BASE_URL=https://mealie.$DOMAINNAME
+      # Database Settings
+      - DB_ENGINE=postgres
+      - POSTGRES_USER=mealie
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_mealie_password
+      - POSTGRES_SERVER=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=tandoor
-      - POSTGRES_PASSWORD=$POSTGRES_TANDOOR_PASSWORD
-      - POSTGRES_DB=tandoor
-      - FRACTION_PREF_DEFAULT=0
-      - COMMENT_PREF_DEFAULT=1
-      - SHOPPING_MIN_AUTOSYNC_INTERVAL=5
-      - GUNICORN_MEDIA=0
-      - ENABLE_SIGNUP=0
-
-  tandoor:
-    container_name: tandoor
-    image: nginx:mainline-alpine
-    restart: always
-    networks:
-      - traefik
-      - internal
-    depends_on:
-      - traefik
-      - tandoor_backend
-    ports:
-      - 8087:80
-    volumes:
-      - $DOCKERDIR/tandoor/staticfiles:/static
-      - $DOCKERDIR/tandoor/nginx_config:/etc/nginx/conf.d:ro
-      - $DOCKERDIR/tandoor/mediafiles:/media
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
+      - POSTGRES_DB=mealie
+    logging: *default-logging
     labels:
       - "traefik.enable=true"
       ## HTTP Routers
-      - "traefik.http.routers.tandoor-rtr.entrypoints=https"
-      - "traefik.http.routers.tandoor-rtr.rule=Host(`tandoor.$DOMAINNAME`)"
-      - "traefik.http.routers.tandoor-rtr.tls=true"
+      - "traefik.http.routers.mealie-rtr.entrypoints=https"
+      - "traefik.http.routers.mealie-rtr.rule=Host(`mealie.$DOMAINNAME`)"
+      - "traefik.http.routers.mealie-rtr.tls=true"
       ## Middlewares
-      - "traefik.http.routers.tandoor-rtr.middlewares=chain-no-auth@file"
+      - "traefik.http.routers.mealie-rtr.middlewares=chain-no-auth@file"
       ## HTTP Services
-      - "traefik.http.routers.tandoor-rtr.service=tandoor-svc"
-      - "traefik.http.services.tandoor-svc.loadbalancer.server.port=80"
-
-  vikunja:
-    container_name: vikunja
-    image: vikunja/vikunja:latest
-    restart: always
-    networks:
-      - traefik
-      - internal
-    depends_on:
-      - traefik
-      - postgres
-      - redis
-    ports:
-      - 8088:3456
-    volumes:
-      - $DOCKERDIR/vikunja:/app/vikunja/files
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      - TZ=$TZ
-      - PUID=$PUID
-      - PGID=$PGID
-      - VIKUNJA_SERVICE_PUBLICURL=https://todo.$DOMAINNAME
-      - VIKUNJA_DATABASE_HOST=postgres
-      - VIKUNJA_DATABASE_PASSWORD=$VIKUNJA_POSTGRES_PASSWORD
-      - VIKUNJA_DATABASE_TYPE=postgres
-      - VIKUNJA_DATABASE_USER=vikunja
-      - VIKUNJA_DATABASE_DATABASE=vikunja
-      - VIKUNJA_SERVICE_JWTSECRET=$VIKUNJA_JWTSECRET
-      - VIKUNJA_SERVICE_ENABLEREGISTRATION=false
-      - VIKUNJA_SERVICE_TIMEZONE=$TZ
-      - VIKUNJA_REDIS_ENABLED=true
-      - VIKUNJA_REDIS_HOST=redis:6379
-      - VIKUNJA_REDIS_PASSWORD=$REDIS_PASSWORD
-      - VIKUNJA_MAILER_ENABLED=true
-      - VIKUNJA_MAILER_HOST=$SMTP_HOST
-      - VIKUNJA_MAILER_PORT=$SMTP_PORT
-      - VIKUNJA_MAILER_USERNAME=$SMTP_USERNAME
-      - VIKUNJA_MAILER_PASSWORD=$SMTP_PASSWORD
-      - VIKUNJA_MAILER_FROMEMAIL=vikunja@$DOMAINNAME
-      - VIKUNJA_MAILER_FORCESSL=true
-      - VIKUNJA_DEFAULTSETTINGS_EMAIL_REMINDERS_ENABLED=true
-      - VIKUNJA_DEFAULTSETTINGS_DISCOVERABLE_BY_NAME=true
-      - VIKUNJA_DEFAULTSETTINGS_OVERDUE_TASKS_REMINDERS_ENABLED=true
-      - VIKUNJA_DEFAULTSETTINGS_TIMEZONE=$TZ
-      - VIKUNJA_DEFAULTSETTINGS_WEEK_START=1
-    labels:
-      - "traefik.enable=true"
-      ## HTTP Routers
-      - "traefik.http.routers.vikunja-rtr.entrypoints=https"
-      - "traefik.http.routers.vikunja-rtr.rule=Host(`todo.$DOMAINNAME`)"
-      - "traefik.http.routers.vikunja-rtr.tls=true"
-      ## Middlewares
-      - "traefik.http.routers.vikunja-rtr.middlewares=chain-no-auth@file"
-      ## HTTP Services
-      - "traefik.http.routers.vikunja-rtr.service=vikunja-svc"
-      - "traefik.http.services.vikunja-svc.loadbalancer.server.port=3456"
-
-#  freshrss:
-#    container_name: freshrss
-#    image: freshrss/freshrss:latest
-#    restart: always
-#    networks:
-#      - traefik
-#      - internal
-#    depends_on:
-#      - traefik
-#      - tandoor_backend
-#    ports:
-#      - 8088:80
-#    volumes:
-#      - $DOCKERDIR/freshrss/data:/var/www/FreshRSS/data
-#      - $DOCKERDIR/freshrss/extensions:/var/www/FreshRSS/extensions
-#    security_opt:
-#      - no-new-privileges:true
-#    environment:
-#      - TZ=$TZ
-#      - PUID=$PUID
-#      - PGID=$PGID
-#      - CRON_MIN=3,33
-#      - ADMIN_EMAIL=admin@example.net
-#      - PUBLISHED_PORT=80
-#      - ADMIN_PASSWORD=freshrss
-#      - ADMIN_API_PASSWORD=freshrss
-#      - BASE_URL=https://freshrss.$DOMAINNAME
-#      - DB_HOST=postgres
-#      - DB_BASE=freshrss
-#      - DB_USER=freshrss
-#      - DB_PASSWORD=$FRESHRSS_POSTGRES_PASSWORD
-#    labels:
-#      - "traefik.enable=true"
-#      ## HTTP Routers
-#      - "traefik.http.routers.freshrss-rtr.entrypoints=https"
-#      - "traefik.http.routers.freshrss-rtr.rule=Host(`freshrss.$DOMAINNAME`)"
-#      - "traefik.http.routers.freshrss-rtr.tls=true"
-#      ## Middlewares
-#      - "traefik.http.routers.freshrss-rtr.middlewares=chain-no-auth@file"
-#      ## HTTP Services
-#      - "traefik.http.routers.freshrss-rtr.service=freshrss-svc"
-#      - "traefik.http.services.freshrss-svc.loadbalancer.server.port=80"
+      - "traefik.http.routers.mealie-rtr.service=mealie-svc"
+      - "traefik.http.services.mealie-svc.loadbalancer.server.port=9000"
